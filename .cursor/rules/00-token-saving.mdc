@@ -1,0 +1,18 @@
+---
+description: Token-saving agent behavior (always on)
+globs:
+alwaysApply: true
+---
+
+# Token saving
+
+- Be concise. Don't restate the request or code back. Summarize; don't paste.
+- Start from `memory-bank/` (projectbrief, activeContext, techContext) instead of re-exploring.
+- Search first (`rg -n pattern path`), then open only the needed files, and only the relevant line ranges of large files.
+- Don't re-read files that haven't changed since you read them.
+- Minimal diffs; never rewrite whole files. Batch related edits into one pass.
+- Skip generated/vendor dirs (build/, .gradle/, node_modules/, .next/, out/, coverage/).
+- Don't print big logs: pipe through `tail -n 40` or `rg -i "error|fail"`.
+- No full builds/test suites unless needed; prefer targeted tests (one class/file).
+- Ask once only if truly ambiguous; otherwise make a sensible choice and note it.
+- After meaningful changes, update `memory-bank/activeContext.md` in 1–3 lines.

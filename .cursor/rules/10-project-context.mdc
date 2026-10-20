@@ -1,0 +1,26 @@
+---
+description: Architecture map, commands and conventions
+globs:
+alwaysApply: true
+---
+
+# Project context — Durpalla driver app (Android)
+
+## Map
+- `app/src/main/java/com/durpalla/driver/`: `MainActivity.kt`, `DriverApplication.kt` (entry);
+  `ui/nav/` (AppNav, NavActions — all Back-to-Home logic), `ui/screens/`, `ui/components/` (Buttons: `DurpallaButton`, `DurpallaFab`…), `ui/theme/Theme.kt`, `ui/DriverViewModel.kt`;
+  `data/` (`Repositories.kt`, `ApiJson.kt`, mock data in `FakeData.kt`); `domain/` (Models, Rules, Format);
+  `call/` (WebRTC + Firestore signaling, `CallApi.kt`, `AudioQuality.kt`); `realtime/` (Pusher); `notifications/` (FCM); `i18n/` (AppLanguage, `Digits.kt`, UiText); `security/BotProtection.kt`.
+- Config: `app/build.gradle.kts`, `gradle/libs.versions.toml`, `app/google-services.json.example`. Docs: `docs/`, README (calling contract).
+- Tests: `app/src/test/…` (unit + Roborazzi screenshot tests).
+
+## Commands
+- Build: `./gradlew :app:assembleDebug`
+- Targeted test: `./gradlew :app:testDebugUnitTest --tests "*DigitFormatterTest"`
+- Avoid full screenshot runs unless UI changed.
+
+## Conventions
+- Brand teal/blue `#0E5F7E` family (see `ui/theme/Theme.kt`); use `DurpallaButton` / brand components.
+- Bangla + English via resources/UiText; Bangla digits for display (`i18n/Digits.kt`), ASCII to the API.
+- Navigation: Done/Close/Back to Home must go to a clean Home (use NavActions).
+- Backend: `durpalla-apigw` under `/api/v1/driver/`; currently uses FakeData until the real client lands.

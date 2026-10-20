@@ -1,0 +1,14 @@
+---
+description: Kotlin + Jetpack Compose conventions
+globs: **/*.kt,**/*.kts
+alwaysApply: false
+---
+
+# Kotlin / Compose
+
+- Material3 only; use the app theme (`DurpallaTheme`) and brand components (`DurpallaButton`, `DurpallaFab`, `DurpallaLogo`) — no ad-hoc colors/buttons.
+- State hoisting: composables take state + lambdas; screens stay stateless and previewable.
+- ViewModel exposes `StateFlow` (collect with `collectAsStateWithLifecycle`); one-off events via callbacks/Channel.
+- User-facing text in string resources (Bangla + English), never hard-coded literals.
+- Digits: Bangla digits for display only; send ASCII digits to the API; parse input accepting both.
+- Keep business rules in pure Kotlin (testable with JUnit); add a targeted test for new logic.
