@@ -1,0 +1,9 @@
+---
+description: Use and update the memory bank
+globs:
+alwaysApply: true
+---
+
+# Memory bank
+
+Read `memory-bank/projectbrief.md` and `activeContext.md` before work; `techContext.md` when touching build/stack. Update `activeContext.md` briefly after meaningful changes. Keep each file short.
