@@ -115,6 +115,13 @@ Deliver every event over both Pusher and FCM. The app de-duplicates (`accepted()
 plus `DurpallaIconButton` and `DurpallaFab`. Use **Accent** (#F28C28) only for each screen's key CTA (Place bid, Send OTP, Withdraw, Start trip).
 Chips and switches use `brandChipColors()` / `brandSwitchColors()`.
 
+## In-app calling (WebRTC + Firestore)
+
+Driver ⇄ customer audio calls use WebRTC (`io.getstream:stream-webrtc-android`) with signaling in the Firestore doc `calls/{callId}`. The full contract (endpoints, FCM `call.incoming`, Firestore fields, error codes, the 30 s missed timeout, call log and audio-quality settings) is in [`docs/calling-contract.md`](docs/calling-contract.md). Sample security rules are in [`docs/firestore.rules`](docs/firestore.rules).
+
+- Without `google-services.json`, `FakeCallProvider` simulates calls offline.
+- With it, `WebRtcCallProvider` signs in to Firebase using the backend custom token (`ServiceLocator.firebaseToken`) and calls the API with `ServiceLocator.authToken`.
+
 ## Language: Bangla / English
 
 - **First run**: after the splash the driver sees a bilingual prompt (*ভাষা নির্বাচন করুন / Choose your language*) with two large options, **বাংলা** and **English**. It only appears while no language is saved.

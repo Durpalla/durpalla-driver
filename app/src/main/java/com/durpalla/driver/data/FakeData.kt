@@ -237,6 +237,22 @@ object ServiceLocator {
             com.durpalla.driver.realtime.PusherRealtimeClient(com.durpalla.driver.BuildConfig.PUSHER_KEY, com.durpalla.driver.BuildConfig.PUSHER_CLUSTER, com.durpalla.driver.BuildConfig.PUSHER_AUTH_URL)
         else com.durpalla.driver.realtime.FakeRealtimeClient(appScope, { requests.requests.value.filter { it.status == RequestStatus.OPEN || it.status == RequestStatus.BIDDING } })
     }
+    /** Set in DriverApplication. */
+    lateinit var appContext: android.content.Context
+    /** Bearer token for the Durpalla API (set by the real auth repository after OTP login). */
+    @Volatile var authToken: () -> String? = { null }
+    /** Firebase custom token (uid = Durpalla userId) for Firestore signaling; GET /auth/firebase-token. */
+    @Volatile var firebaseToken: suspend () -> String? = { null }
+    var firebaseConfigured = false
+    val callApi: com.durpalla.driver.call.CallApi by lazy { com.durpalla.driver.call.HttpCallApi(com.durpalla.driver.BuildConfig.API_BASE_URL, { authToken() }) }
+    /** WebRTC + Firestore when Firebase is configured, otherwise the offline simulator. */
+    val calls: com.durpalla.driver.call.CallProvider by lazy {
+        if (firebaseConfigured) com.durpalla.driver.call.WebRtcCallProvider(appContext, appScope, callApi,
+            com.durpalla.driver.call.FirestoreSignaling(customToken = { firebaseToken() }))
+        else com.durpalla.driver.call.FakeCallProvider(appScope)
+    }
+    /** Set when the user tapped Accept on the incoming-call notification. */
+    val acceptFromNotification = kotlinx.coroutines.flow.MutableStateFlow(false)
     var botProtection: com.durpalla.driver.security.BotProtection = com.durpalla.driver.security.NoopBotProtection
     /** Replaced with the DataStore + AppCompat implementation in DriverApplication. */
     var language: com.durpalla.driver.i18n.LanguageManager =

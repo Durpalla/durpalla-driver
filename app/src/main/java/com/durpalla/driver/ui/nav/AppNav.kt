@@ -68,9 +68,18 @@ fun DriverApp(
     language: LanguageManager = ServiceLocator.language,
     onLanguageApplied: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
+    calls: com.durpalla.driver.call.CallProvider = ServiceLocator.calls,
 ) {
     val scope = rememberCoroutineScope()
     val nav = navController
+    val callState by calls.state.collectAsStateWithLifecycle()
+    val micDeniedMsg = stringResource(R.string.call_mic_denied)
+    val callCtx = androidx.compose.ui.platform.LocalContext.current
+    val withMic = rememberWithMic { android.widget.Toast.makeText(callCtx, micDeniedMsg, android.widget.Toast.LENGTH_LONG).show() }
+    val acceptRequested by ServiceLocator.acceptFromNotification.collectAsStateWithLifecycle()
+    LaunchedEffect(acceptRequested, callState) {
+        if (acceptRequested && callState is com.durpalla.driver.call.CallState.Incoming) { ServiceLocator.acceptFromNotification.value = false; withMic { calls.accept() } }
+    }
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
     val requests by vm.openRequests.collectAsStateWithLifecycle()
@@ -186,11 +195,12 @@ fun DriverApp(
             }
             composable(Routes.TRIP) { e ->
                 val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
-                TripDetailScreen(t, { nav.popBackStack() }, { vm.setTripStatus(t.id, TripStatus.ON_THE_WAY); nav.go(Routes.live(t.id)) })
+                TripDetailScreen(t, { nav.popBackStack() }, { vm.setTripStatus(t.id, TripStatus.ON_THE_WAY); nav.go(Routes.live(t.id)) },
+                    onCall = { withMic { calls.startCall(t.id, t.customer.name) } })
             }
             composable(Routes.LIVE) { e ->
                 val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
-                LiveTripScreen(t, { vm.setTripStatus(t.id, it) }, onCollect = { nav.go(Routes.collect(t.id)) })
+                LiveTripScreen(t, { vm.setTripStatus(t.id, it) }, onCollect = { nav.go(Routes.collect(t.id)) }, onCall = { withMic { calls.startCall(t.id, t.customer.name) } })
             }
             composable(Routes.COLLECT) { e ->
                 val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
@@ -243,6 +253,12 @@ fun DriverApp(
             banner?.let { b ->
                 LiveBannerCard(b, onOpen = { vm.dismissBanner(); nav.openDeepLink(b.route) }, onDismiss = vm::dismissBanner)
             }
+        }
+        // In-app call (WebRTC audio): drawn above everything; system back can't dismiss a live call.
+        if (callState !is com.durpalla.driver.call.CallState.Idle) {
+            androidx.activity.compose.BackHandler { }
+            CallScreen(callState, onAccept = { withMic { calls.accept() } }, onDecline = calls::decline, onHangUp = calls::hangUp,
+                onMute = calls::setMuted, onSpeaker = calls::setSpeaker, onDismiss = calls::dismissEnded)
         }
         // Auto-hide non-critical banners.
         LaunchedEffect(banner) { if (banner != null && banner?.kind != LiveBanner.Kind.ACCEPTED) { kotlinx.coroutines.delay(6000); vm.dismissBanner() } }
