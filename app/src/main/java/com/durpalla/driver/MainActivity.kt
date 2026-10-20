@@ -44,5 +44,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handle(intent) }
 
-    private fun handle(i: Intent?) { i?.getStringExtra(DeepLink.EXTRA)?.let { deepLink.value = it } }
+    private fun handle(i: Intent?) {
+        i?.getStringExtra(DeepLink.EXTRA)?.let { deepLink.value = it }
+        if (i?.getBooleanExtra(com.durpalla.driver.call.CallActionReceiver.EXTRA_ACCEPT, false) == true) ServiceLocator.acceptFromNotification.value = true
+    }
 }

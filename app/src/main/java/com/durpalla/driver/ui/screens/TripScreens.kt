@@ -206,12 +206,13 @@ fun TripDetailScreen(t: Trip, onBack: () -> Unit, onStart: () -> Unit, onCall: (
                 KeyValue(stringResource(R.string.to_collect), taka(t.fare - t.advancePaid), DP.Accent, true); KeyValue(str(R.string.commission_pct, Commission.RATE_PERCENT), taka(Commission.of(t.fare)))
                 t.paymentMethod?.let { KeyValue(stringResource(R.string.paid_via), it.title()) }
             }
+            CallLogCard(t.callLog)
         }
     }
 }
 
 @Composable
-fun LiveTripScreen(t: Trip, onAdvance: (TripStatus) -> Unit, onCollect: () -> Unit, onSos: () -> Unit = {}) {
+fun LiveTripScreen(t: Trip, onAdvance: (TripStatus) -> Unit, onCollect: () -> Unit, onSos: () -> Unit = {}, onCall: () -> Unit = {}) {
     val (label, next) = when (t.status) {
         TripStatus.UPCOMING, TripStatus.ON_THE_WAY -> stringResource(R.string.arrived_pickup) to TripStatus.ARRIVED
         TripStatus.ARRIVED -> stringResource(R.string.start_ride) to TripStatus.IN_PROGRESS
@@ -226,7 +227,10 @@ fun LiveTripScreen(t: Trip, onAdvance: (TripStatus) -> Unit, onCollect: () -> Un
             Column(Modifier.background(Color.White).padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusChip(if (t.status == TripStatus.UPCOMING) TripStatus.ON_THE_WAY.label() else t.status.label(), Tone.ACCENT)
                 RouteText(t.from, t.to, MaterialTheme.typography.titleLarge)
-                Text(str(R.string.dot_join3, t.customer.name, pax(t.passengers), t.code), color = DP.Muted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(str(R.string.dot_join3, t.customer.name, pax(t.passengers), t.code), color = DP.Muted, modifier = Modifier.weight(1f))
+                    DurpallaIconButton(Icons.Filled.Call, stringResource(R.string.call), onCall)
+                }
                 LinearProgressIndicator(progress = { when (t.status) { TripStatus.ARRIVED -> 0.35f; TripStatus.IN_PROGRESS -> 0.7f; else -> 0.1f } }, modifier = Modifier.fillMaxWidth(), color = DP.Primary500, trackColor = DP.Primary100)
             }
         }

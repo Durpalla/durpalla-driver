@@ -64,6 +64,8 @@ data class Trip(
     val paymentMethod: PaymentMethod? = null,
     val ratingGiven: Int? = null,
     val fromPredefined: Boolean = false,
+    /** trip.callLog from the API (see docs/calling-contract.md). */
+    val callLog: List<com.durpalla.driver.call.CallLogEntry> = emptyList(),
 )
 
 data class PredefinedTrip(
