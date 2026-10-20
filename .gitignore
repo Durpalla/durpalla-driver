@@ -10,3 +10,6 @@ build/
 *.apk
 *.aab
 *.keystore
+
+# Firebase config (per environment)
+app/google-services.json

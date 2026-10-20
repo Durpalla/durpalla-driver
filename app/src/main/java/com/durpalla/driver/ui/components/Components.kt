@@ -52,21 +52,12 @@ fun DCard(modifier: Modifier = Modifier, color: Color = Color.White, border: Col
 }
 
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, accent: Boolean = false) {
-    Button(
-        onClick = onClick, enabled = enabled, modifier = modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = if (accent) DP.Accent else DP.Primary500),
-    ) { Text(text, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-}
+fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, accent: Boolean = false, loading: Boolean = false) =
+    DurpallaButton(text, onClick, modifier, if (accent) ButtonVariant.Accent else ButtonVariant.Primary, enabled = enabled, loading = loading)
 
 @Composable
-fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false) {
-    OutlinedButton(
-        onClick = onClick, modifier = modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, if (danger) DP.Danger else DP.Primary500),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (danger) DP.Danger else DP.Primary500),
-    ) { Text(text, fontWeight = FontWeight.SemiBold) }
-}
+fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false, enabled: Boolean = true) =
+    DurpallaButton(text, onClick, modifier, if (danger) ButtonVariant.Danger else ButtonVariant.Secondary, enabled = enabled)
 
 /** CTA pinned to the bottom of a screen (use in Scaffold bottomBar). */
 @Composable
@@ -111,7 +102,7 @@ fun FilterChips(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { i, s ->
             FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(s) }, shape = RoundedCornerShape(50),
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = DP.Primary500, selectedLabelColor = Color.White))
+                colors = brandChipColors(), border = FilterChipDefaults.filterChipBorder(true, i == selected, borderColor = DP.Line, selectedBorderColor = DP.Primary500))
         }
     }
 }
@@ -211,3 +202,12 @@ fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> 
 
 @Composable
 private fun Modifier.verticalScrollable(): Modifier = this.then(Modifier.verticalScroll(rememberScrollState()))
+
+@Composable
+fun brandChipColors() = FilterChipDefaults.filterChipColors(
+    containerColor = Color.White, labelColor = DP.Ink, selectedContainerColor = DP.Primary500, selectedLabelColor = Color.White,
+    selectedLeadingIconColor = Color.White, iconColor = DP.Primary500,
+)
+
+@Composable
+fun brandSwitchColors() = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = DP.Primary500, uncheckedThumbColor = DP.Muted, uncheckedTrackColor = DP.Line, uncheckedBorderColor = DP.Line)

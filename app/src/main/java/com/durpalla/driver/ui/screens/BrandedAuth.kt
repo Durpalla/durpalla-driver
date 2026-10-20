@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.durpalla.driver.R
 import com.durpalla.driver.ui.AuthState
+import com.durpalla.driver.ui.components.ButtonVariant
+import com.durpalla.driver.ui.components.DurpallaButton
 import com.durpalla.driver.ui.theme.DP
 import kotlinx.coroutines.delay
 
@@ -90,7 +92,7 @@ private fun BrandedAuthLayout(onBack: (() -> Unit)? = null, card: @Composable Co
             ) {
               Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.fillMaxWidth().height(40.dp)) {
-                    if (onBack != null) IconButton(onBack, Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.14f))) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
+                    if (onBack != null) IconButton(onBack, Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.14f)), colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 }
                 // Header
                 Box(Modifier.size(84.dp).shadow(12.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp)).background(Color.White), contentAlignment = Alignment.Center) {
@@ -123,10 +125,8 @@ private fun Motif(icon: ImageVector, label: String) = Row(
 ) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(14.dp)); Text(" $label", color = Color.White, fontSize = 12.sp) }
 
 @Composable
-private fun AccentCta(text: String, enabled: Boolean, onClick: () -> Unit) = Button(
-    onClick, Modifier.fillMaxWidth().height(54.dp), enabled = enabled, shape = RoundedCornerShape(14.dp),
-    colors = ButtonDefaults.buttonColors(containerColor = DP.Accent, contentColor = Color.White, disabledContainerColor = DP.Accent.copy(alpha = 0.45f), disabledContentColor = Color.White),
-) { Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+private fun AccentCta(text: String, enabled: Boolean, loading: Boolean = false, onClick: () -> Unit) =
+    DurpallaButton(text, onClick, variant = ButtonVariant.Accent, enabled = enabled, loading = loading)
 
 /** Phone login. The VM keeps the 11-digit local number (01XXXXXXXXX); the field shows +880 and the 10 digits after 0. */
 @Composable
@@ -149,7 +149,7 @@ fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> 
             isError = state.error != null, supportingText = state.error?.let { { Text(it) } },
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DP.Primary500, focusedLabelColor = DP.Primary500),
         )
-        AccentCta(if (state.loading) "Sending code…" else "Send OTP", !state.loading && local.length == 10, onSend)
+        AccentCta(if (state.loading) "Sending code…" else "Send OTP", local.length == 10, state.loading, onSend)
         Text(buildAnnotatedString {
             append("By continuing you agree to Durpalla's ")
             withStyle(SpanStyle(color = DP.Primary500, fontWeight = FontWeight.SemiBold)) { append("Driver Terms") }

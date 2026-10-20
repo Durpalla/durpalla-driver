@@ -9,7 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
  */
 
 interface AuthRepository {
-    suspend fun requestOtp(phone: String): Result<Unit>
+    /** [captchaToken] = reCAPTCHA Enterprise token for action LOGIN (null when bot protection is off). */
+    suspend fun requestOtp(phone: String, captchaToken: String?): Result<Unit>
+    /** FCM registration token -> backend, so it can push to this device. */
+    suspend fun registerDeviceToken(token: String): Result<Unit>
     suspend fun verifyOtp(phone: String, code: String): Result<Boolean> // true = KYC complete
     suspend fun submitKyc(type: VehicleType, docs: List<String>): Result<Unit>
 }
@@ -21,6 +24,12 @@ interface RequestRepository {
     suspend fun skip(requestId: String)
     /** Simulates the customer choosing this driver's bid. */
     suspend fun simulateWin(bidId: String): Result<Trip>
+    // Realtime (Pusher/FCM) updates
+    suspend fun upsertRequest(r: TripRequest)
+    suspend fun updateCompetition(requestId: String, bidCount: Int)
+    /** Customer accepted this bid: mark won, expire overlapping bids, create the trip. */
+    suspend fun accepted(bidId: String, tripId: String, tripCode: String, advancePaid: Int): Result<Trip>
+    suspend fun rejected(bidId: String)
 }
 
 interface TripRepository {

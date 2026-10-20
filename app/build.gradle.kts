@@ -1,9 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.roborazzi)
 }
+
+// Firebase is optional: the google-services plugin is applied only when app/google-services.json exists,
+// so the project builds (with push disabled) on machines without Firebase credentials.
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
+
+// Secrets/config: local.properties > gradle property (-P or ~/.gradle/gradle.properties) > env > default.
+val localProps = Properties().apply { rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) } }
+fun cfg(key: String, default: String = ""): String =
+    (localProps.getProperty(key) ?: (project.findProperty(key) as String?) ?: System.getenv(key) ?: default).replace("\"", "")
 
 android {
     namespace = "com.durpalla.driver"
@@ -16,8 +27,11 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
-        // Swap for your backend when wiring the real API (see README).
-        buildConfigField("String", "API_BASE_URL", "\"https://api.durpalla.com/driver/v1/\"")
+        buildConfigField("String", "API_BASE_URL", "\"${cfg("API_BASE_URL", "https://api.durpalla.com/driver/v1/")}\"")
+        buildConfigField("String", "PUSHER_KEY", "\"${cfg("PUSHER_KEY")}\"")
+        buildConfigField("String", "PUSHER_CLUSTER", "\"${cfg("PUSHER_CLUSTER", "ap2")}\"")
+        buildConfigField("String", "PUSHER_AUTH_URL", "\"${cfg("PUSHER_AUTH_URL", "https://api.durpalla.com/driver/v1/realtime/auth")}\"")
+        buildConfigField("String", "RECAPTCHA_SITE_KEY", "\"${cfg("RECAPTCHA_SITE_KEY")}\"")
     }
 
     buildTypes {
@@ -52,6 +66,12 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.appcheck.playintegrity)
+    implementation(libs.pusher.java.client)
+    implementation(libs.recaptcha)
+    implementation(libs.gson)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

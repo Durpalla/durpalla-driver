@@ -56,7 +56,7 @@ fun MyTripsScreen(trips: List<Trip>, predefined: List<PredefinedTrip>, onTrip: (
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Scaffold(
         topBar = { DTopBar("My trips", actions = { IconButton(onClick = onCalendar) { Icon(Icons.Filled.CalendarMonth, "Availability") } }) },
-        floatingActionButton = { if (tab == 1) ExtendedFloatingActionButton(onClick = onCreate, containerColor = DP.Accent, contentColor = Color.White, icon = { Icon(Icons.Filled.Add, null) }, text = { Text("New trip") }) },
+        floatingActionButton = { if (tab == 1) DurpallaFab("New trip", Icons.Filled.Add, onCreate) },
     ) { pad ->
         ScreenColumn(pad) {
             SegmentedTabs(listOf("Upcoming", "Pre-defined", "History"), tab, { tab = it })
@@ -118,21 +118,21 @@ fun PredefinedFormScreen(initial: PredefinedTrip?, onBack: () -> Unit, onSave: (
         ScreenColumn(pad) {
             Text("Vehicle", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VehicleType.entries.forEach { FilterChip(it == type, { type = it }, { Text("${it.emoji} ${it.label}") }) }
+                VehicleType.entries.forEach { FilterChip(it == type, { type = it }, { Text("${it.emoji} ${it.label}") }, colors = brandChipColors()) }
             }
             OutlinedTextField(from, { from = it }, label = { Text("From (ghat / pickup)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(to, { to = it }, label = { Text("To") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(time, { time = it }, label = { Text("Departure time") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             Text("Runs on", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                weekDays.forEach { d -> FilterChip(d in days, { days = if (d in days) days - d else days + d }, { Text(d) }) }
+                weekDays.forEach { d -> FilterChip(d in days, { days = if (d in days) days - d else days + d }, { Text(d) }, colors = brandChipColors()) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(seats, { seats = it.filter(Char::isDigit) }, label = { Text("Seats") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 OutlinedTextField(rent, { rent = it.filter(Char::isDigit) }, label = { Text("Fixed rent") }, prefix = { Text("৳") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             }
             rent.toIntOrNull()?.let { Text("You'll earn ${taka(Commission.netOf(it))} after ${Commission.RATE_PERCENT}% commission", color = DP.Success, fontSize = 13.sp) }
-            Row(verticalAlignment = Alignment.CenterVertically) { Text("Visible to customers", Modifier.weight(1f)); Switch(active, { active = it }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Visible to customers", Modifier.weight(1f)); Switch(active, { active = it }, colors = brandSwitchColors()) }
         }
     }
 }
@@ -191,7 +191,7 @@ fun TripDetailScreen(t: Trip, onBack: () -> Unit, onStart: () -> Unit, onCall: (
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Avatar(t.customer.name)
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(t.customer.name, style = MaterialTheme.typography.titleSmall); RatingText(t.customer.rating) }
-                    FilledIconButton(onClick = onCall, colors = IconButtonDefaults.filledIconButtonColors(containerColor = DP.Primary100, contentColor = DP.Primary500)) { Icon(Icons.Filled.Call, "Call") }
+                    DurpallaIconButton(Icons.Filled.Call, "Call", onCall)
                 }
             }
             DCard {
@@ -214,7 +214,7 @@ fun LiveTripScreen(t: Trip, onAdvance: (TripStatus) -> Unit, onCollect: () -> Un
         Column(Modifier.fillMaxSize().padding(pad)) {
             Box(Modifier.weight(1f)) {
                 MapPlaceholder(t.from, t.to, Modifier.fillMaxSize(), height = 400.dp)
-                FilledTonalButton(onClick = onSos, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp), colors = ButtonDefaults.filledTonalButtonColors(containerColor = DP.Danger, contentColor = Color.White)) { Text("SOS") }
+                DurpallaButton("SOS", onSos, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp), ButtonVariant.Danger, ButtonSize.Medium, fillWidth = false)
             }
             Column(Modifier.background(Color.White).padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusChip(if (t.status == TripStatus.UPCOMING) TripStatus.ON_THE_WAY.label() else t.status.label(), Tone.ACCENT)
