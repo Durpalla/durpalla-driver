@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import com.durpalla.driver.data.SampleData
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.BidFormState
+import com.durpalla.driver.realtime.ConnectionState
+import com.durpalla.driver.realtime.LiveBid
 import com.durpalla.driver.ui.components.*
 import com.durpalla.driver.ui.theme.DP
 import kotlinx.coroutines.delay
@@ -32,6 +34,7 @@ fun HomeScreen(
     driver: Driver, online: Boolean, onOnline: (Boolean) -> Unit, summary: EarningsSummary,
     activeBids: Int, upcoming: Trip?, requests: List<TripRequest>, isBlocked: (TripRequest) -> Boolean,
     onNotifications: () -> Unit, onUpcoming: (Trip) -> Unit, onRequest: (TripRequest) -> Unit, onSkip: (TripRequest) -> Unit, onSeeAll: () -> Unit,
+    connection: ConnectionState = ConnectionState.LIVE,
 ) {
     Column(Modifier.fillMaxSize().background(DP.Bg)) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -40,6 +43,7 @@ fun HomeScreen(
                 Text("Good afternoon", color = DP.Muted, fontSize = 12.sp)
                 Text("${driver.name} ★ ${driver.rating}", style = MaterialTheme.typography.titleMedium)
             }
+            if (online) LiveIndicator(connection)
             IconButton(onClick = onNotifications) { BadgedBox(badge = { Badge(containerColor = DP.Accent) }) { Icon(Icons.Filled.Notifications, "Notifications") } }
         }
         ScreenColumn(PaddingValues(0.dp)) {
@@ -49,7 +53,7 @@ fun HomeScreen(
                         Text(if (online) "You are Online" else "You are Offline", style = MaterialTheme.typography.titleMedium)
                         Text(if (online) "Receiving requests near ${driver.area.substringBefore(",")}" else "Go online to receive trip requests", color = DP.Muted, fontSize = 12.sp)
                     }
-                    Switch(checked = online, onCheckedChange = onOnline, colors = SwitchDefaults.colors(checkedTrackColor = DP.Success))
+                    Switch(checked = online, onCheckedChange = onOnline, colors = brandSwitchColors())
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -107,7 +111,8 @@ fun Countdown(totalSec: Int, onExpire: () -> Unit = {}) {
 }
 
 @Composable
-fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, onSkip: () -> Unit, onBid: () -> Unit, onConflict: () -> Unit) {
+fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, onSkip: () -> Unit, onBid: () -> Unit, onConflict: () -> Unit,
+    live: LiveBid? = null, connection: ConnectionState = ConnectionState.LIVE) {
     Scaffold(
         topBar = { DTopBar("Trip request", onBack) },
         bottomBar = {
@@ -122,8 +127,9 @@ fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, o
         ScreenColumn(pad) {
             MapPlaceholder(r.from, r.to)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Countdown(r.expiresInSec); Spacer(Modifier.weight(1f)); Text("${r.bidsCount} bids so far", color = DP.Muted, fontSize = 12.sp)
+                Countdown(r.expiresInSec); Spacer(Modifier.weight(1f)); LiveIndicator(connection)
             }
+            LiveBidPanel(r, live, connection)
             DCard {
                 Row(verticalAlignment = Alignment.CenterVertically) { VehicleBadge(r.vehicleType); Spacer(Modifier.width(12.dp)); RouteText(r.from, r.to, MaterialTheme.typography.titleLarge) }
                 Spacer(Modifier.height(8.dp))
@@ -146,13 +152,15 @@ fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, o
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Unit, onNote: (String) -> Unit, onBack: () -> Unit, onSubmit: () -> Unit, onDone: () -> Unit) {
+fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Unit, onNote: (String) -> Unit, onBack: () -> Unit, onSubmit: () -> Unit, onDone: () -> Unit,
+    live: LiveBid? = null, connection: ConnectionState = ConnectionState.LIVE) {
     val amt = form.amountInt ?: 0
     Scaffold(topBar = { DTopBar("Place your bid", onBack) }, bottomBar = {
-        StickyCta { PrimaryButton(if (form.submitting) "Submitting…" else "Submit bid ${if (amt > 0) taka(amt) else ""}", onSubmit, enabled = !form.submitting && amt > 0, accent = true) }
+        StickyCta { PrimaryButton(if (form.submitting) "Submitting…" else "Place bid ${if (amt > 0) taka(amt) else ""}", onSubmit, enabled = amt > 0, accent = true, loading = form.submitting) }
     }) { pad ->
         ScreenColumn(pad) {
             DCard { RouteText(r.from, r.to); Text("${r.slot.label()} · ${r.passengers} pax", color = DP.Muted, fontSize = 12.sp) }
+            LiveBidPanel(r, live, connection)
             DCard(color = DP.Primary100, border = null) {
                 Text("Suggested range", color = DP.Primary600, fontSize = 12.sp)
                 Text("${taka(r.suggestedMin)} – ${taka(r.suggestedMax)}", style = MaterialTheme.typography.titleLarge, color = DP.Primary700)
@@ -166,7 +174,7 @@ fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Uni
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(r.suggestedMin, (r.suggestedMin + r.suggestedMax) / 2, r.suggestedMax).forEach { v ->
-                    AssistChip(onClick = { onAmount(v.toString()) }, label = { Text(taka(v)) })
+                    DurpallaButton(taka(v), { onAmount(v.toString()) }, Modifier.weight(1f), ButtonVariant.Secondary, ButtonSize.Small)
                 }
             }
             OutlinedTextField(form.note, onNote, label = { Text("Note to customer (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2, shape = RoundedCornerShape(14.dp))
@@ -183,7 +191,7 @@ fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Uni
             Column(Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Filled.CheckCircle, null, tint = DP.Success, modifier = Modifier.size(56.dp))
                 Text("Bid submitted", style = MaterialTheme.typography.titleLarge)
-                Text("${taka(form.submitted.amount)} for ${r.from} → ${r.to}. We'll notify you when the customer chooses.", color = DP.Muted, textAlign = TextAlign.Center)
+                Text("${taka(form.submitted.amount)} for ${r.from} → ${r.to}. You'll get an instant alert when the customer chooses.", color = DP.Muted, textAlign = TextAlign.Center)
                 PrimaryButton("Go to My Bids", onDone)
             }
         }
@@ -194,10 +202,11 @@ fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Uni
 fun RequestsScreen(
     requests: List<TripRequest>, bids: List<Bid>, isBlocked: (TripRequest) -> Boolean, initialTab: Int = 0,
     onNotifications: () -> Unit, onRequest: (TripRequest) -> Unit, onBid: (Bid) -> Unit,
+    connection: ConnectionState = ConnectionState.LIVE,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(initialTab) }
     var filter by rememberSaveable { mutableIntStateOf(0) }
-    Scaffold(topBar = { DTopBar("Requests", actions = { IconButton(onClick = onNotifications) { Icon(Icons.Filled.Notifications, null) } }) }) { pad ->
+    Scaffold(topBar = { DTopBar("Requests", actions = { LiveIndicator(connection); IconButton(onClick = onNotifications) { Icon(Icons.Filled.Notifications, null) } }) }) { pad ->
         ScreenColumn(pad) {
             SegmentedTabs(listOf("New (${requests.size})", "My bids"), tab, { tab = it })
             if (tab == 0) {
@@ -281,7 +290,9 @@ fun SlotConflictScreen(request: TripRequest, conflict: Trip?, onBack: () -> Unit
     HomeScreen(SampleData.driver, true, {}, SampleData.summary, 5, SampleData.trips[0], SampleData.requests, { it.id == "r3" }, {}, {}, {}, {}, {})
 }
 @PhonePreview @Composable private fun IncomingPreview() = P { IncomingRequestScreen(SampleData.requests[0], null, {}, {}, {}, {}) }
-@PhonePreview @Composable private fun PlaceBidPreview() = P { PlaceBidScreen(SampleData.requests[0], BidFormState(amount = "3200"), {}, {}, {}, {}, {}) }
+@PhonePreview @Composable private fun PlaceBidPreview() = P {
+    PlaceBidScreen(SampleData.requests[0], BidFormState(amount = "3200"), {}, {}, {}, {}, {}, LiveBid("r1", 5, 3000, "b1", 3200, BidStatus.PENDING), ConnectionState.LIVE)
+}
 @PhonePreview @Composable private fun RequestsPreview() = P { RequestsScreen(SampleData.requests, emptyList(), { false }, 0, {}, {}, {}) }
 @PhonePreview @Composable private fun MyBidsPreview() = P {
     val r = SampleData.requests

@@ -62,7 +62,7 @@ fun EarningsScreen(s: EarningsSummary, onWithdraw: () -> Unit, onWallet: () -> U
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PrimaryButton("Withdraw", onWithdraw, Modifier.weight(1f), accent = true)
-                    Button(onClick = onWallet, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f))) { Text("Transactions") }
+                    DurpallaButton("Transactions", onWallet, Modifier.weight(1f), ButtonVariant.OnDark)
                 }
             }
             SegmentedTabs(listOf("Day", "Week", "Month"), range, { range = it })
@@ -105,7 +105,7 @@ fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawSt
             }
             OutlinedTextField(st.amount, onAmount, label = { Text("Amount") }, prefix = { Text("৳ ") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), supportingText = { Text("Min ৳500 · free for bKash/Nagad, ৳10 for bank") }, shape = RoundedCornerShape(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(1000, 5000, balance).forEach { v -> AssistChip({ onAmount(v.toString()) }, { Text(if (v == balance) "All" else taka(v)) }) } }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(1000, 5000, balance).forEach { v -> DurpallaButton(if (v == balance) "All" else taka(v), { onAmount(v.toString()) }, variant = ButtonVariant.Secondary, size = ButtonSize.Small, fillWidth = false) } }
         }
     }
     if (showPin && st.done == null) {
@@ -118,8 +118,8 @@ fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawSt
                 OutlinedTextField(st.pin, onPin, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), textStyle = LocalTextStyle.current.copy(fontSize = 24.sp, letterSpacing = 16.sp, textAlign = TextAlign.Center),
                     isError = st.error != null, supportingText = { st.error?.let { Text(it) } })
-                PrimaryButton(if (st.loading) "Processing…" else "Confirm withdraw", onConfirm, enabled = st.pin.length == 4 && !st.loading)
-                TextButton(onClick = { scope.launch { sheet.hide(); showPin = false } }, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+                PrimaryButton(if (st.loading) "Processing…" else "Confirm withdraw", onConfirm, enabled = st.pin.length == 4, accent = true, loading = st.loading)
+                DurpallaButton("Cancel", { scope.launch { sheet.hide(); showPin = false } }, variant = ButtonVariant.Text)
             }
         }
     }

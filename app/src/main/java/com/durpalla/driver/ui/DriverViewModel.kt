@@ -6,6 +6,12 @@ import com.durpalla.driver.data.*
 import com.durpalla.driver.domain.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.durpalla.driver.realtime.*
+import com.durpalla.driver.security.BotProtection
+
+data class LiveBanner(val kind: Kind, val title: String, val body: String, val route: String) {
+    enum class Kind { ACCEPTED, REQUEST, INFO, WARNING }
+}
 
 data class AuthState(val phone: String = "", val loading: Boolean = false, val error: String? = null, val kycType: VehicleType = VehicleType.SPEEDBOAT, val uploaded: Set<String> = emptySet())
 
@@ -26,7 +32,44 @@ class DriverViewModel(
     private val earningsRepo: EarningsRepository = ServiceLocator.earnings,
     private val profileRepo: ProfileRepository = ServiceLocator.profile,
     val policy: SlotLockPolicy = ServiceLocator.slotPolicy,
+    private val realtime: RealtimeClient = ServiceLocator.realtime,
+    private val bot: () -> BotProtection = { ServiceLocator.botProtection },
+    driverId: String = "drv_rafiq",
 ) : ViewModel() {
+
+    // ---- Realtime (Pusher / FCM / simulator)
+    val connection: StateFlow<ConnectionState> = realtime.connection
+    private val _live = MutableStateFlow<Map<String, LiveBid>>(emptyMap())
+    /** Live competition per request id: bid count, lowest bid, my status. */
+    val liveBids: StateFlow<Map<String, LiveBid>> = _live
+    private val _banner = MutableStateFlow<LiveBanner?>(null)
+    /** In-app high-priority banner (e.g. customer accepted your bid). */
+    val banner: StateFlow<LiveBanner?> = _banner
+    fun dismissBanner() { _banner.value = null }
+
+    init {
+        realtime.connect(driverId) { null /* bearer token from your auth store */ }
+        viewModelScope.launch { realtime.events.collect { onEvent(it) } }
+    }
+
+    internal suspend fun onEvent(e: RealtimeEvent) {
+        _live.update { BidReducer.reduce(it, e) }
+        when (e) {
+            is RealtimeEvent.TripRequested -> { requestRepo.upsertRequest(e.request); _banner.value = LiveBanner(LiveBanner.Kind.REQUEST, "New ${e.request.vehicleType.label} request", "${e.request.from} → ${e.request.to} · ${e.request.passengers} pax", "request/${e.request.id}") }
+            is RealtimeEvent.BidPlaced -> requestRepo.updateCompetition(e.requestId, e.bidCount)
+            is RealtimeEvent.BidUpdated -> requestRepo.updateCompetition(e.requestId, e.bidCount)
+            is RealtimeEvent.BidAccepted -> requestRepo.accepted(e.bidId, e.tripId, e.tripCode, e.advancePaid).onSuccess { t ->
+                realtime.watchTrip(t.id)
+                _banner.value = LiveBanner(LiveBanner.Kind.ACCEPTED, "Customer accepted your bid!", "${t.from} → ${t.to} · ${taka(t.fare)} · slot locked", "won/${t.id}")
+            }
+            is RealtimeEvent.BidRejected -> { requestRepo.rejected(e.bidId); _banner.value = LiveBanner(LiveBanner.Kind.INFO, "Bid not selected", e.reason, "requests") }
+            is RealtimeEvent.TripCancelled -> { tripRepo.updateStatus(e.tripId, TripStatus.CANCELLED); _banner.value = LiveBanner(LiveBanner.Kind.WARNING, "Trip cancelled", e.reason, "trip/${e.tripId}") }
+            is RealtimeEvent.PaymentReceived -> _banner.value = LiveBanner(LiveBanner.Kind.INFO, "Payment received", "${taka(e.amount)} via ${e.method.label}", "wallet")
+            is RealtimeEvent.SlotLocked, is RealtimeEvent.SlotReleased -> Unit // server-side lock mirrors local trips; refresh trips from API here
+        }
+    }
+
+    override fun onCleared() { realtime.disconnect() }
 
     val requests = requestRepo.requests
     val bids = requestRepo.bids
@@ -57,7 +100,11 @@ class DriverViewModel(
     fun setPhone(p: String) = _auth.update { it.copy(phone = p.filter(Char::isDigit).take(11), error = null) }
     fun sendOtp(onOk: () -> Unit) = viewModelScope.launch {
         if (_auth.value.phone.length != 11) { _auth.update { it.copy(error = "Enter an 11-digit mobile number") }; return@launch }
-        _auth.update { it.copy(loading = true) }; auth.requestOtp(_auth.value.phone); _auth.update { it.copy(loading = false) }; onOk()
+        _auth.update { it.copy(loading = true) }
+        val captcha = bot().token(BotProtection.LOGIN) // reCAPTCHA Enterprise; null when disabled
+        auth.requestOtp(_auth.value.phone, captcha)
+            .onSuccess { _auth.update { it.copy(loading = false) }; onOk() }
+            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.message) } }
     }
     fun verifyOtp(code: String, onOk: (kycDone: Boolean) -> Unit) = viewModelScope.launch {
         auth.verifyOtp(_auth.value.phone, code).onSuccess(onOk).onFailure { e -> _auth.update { it.copy(error = e.message) } }
@@ -77,7 +124,11 @@ class DriverViewModel(
         val amt = f.amountInt ?: run { _bid.update { it.copy(error = "Enter a rent amount") }; return@launch }
         _bid.update { it.copy(submitting = true) }
         requestRepo.placeBid(requestId, amt, f.note)
-            .onSuccess { b -> _bid.update { it.copy(submitting = false, submitted = b) } }
+            .onSuccess { b ->
+                _bid.update { it.copy(submitting = false, submitted = b) }
+                _live.update { BidReducer.myBid(it, requestId, b.id, b.amount) }
+                realtime.onOwnBidPlaced(b)
+            }
             .onFailure { e -> _bid.update { it.copy(submitting = false, error = e.message) } }
     }
     fun skip(requestId: String) = viewModelScope.launch { requestRepo.skip(requestId) }

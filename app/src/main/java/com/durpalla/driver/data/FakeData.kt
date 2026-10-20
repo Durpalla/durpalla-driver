@@ -91,7 +91,9 @@ object SampleData {
 }
 
 class FakeAuthRepository : AuthRepository {
-    override suspend fun requestOtp(phone: String) = run { delay(400); Result.success(Unit) }
+    override suspend fun requestOtp(phone: String, captchaToken: String?) = run { delay(400); Result.success(Unit) }
+    var lastDeviceToken: String? = null; private set
+    override suspend fun registerDeviceToken(token: String) = run { lastDeviceToken = token; Result.success(Unit) }
     override suspend fun verifyOtp(phone: String, code: String): Result<Boolean> {
         delay(400)
         return if (code.length == 6) Result.success(false) else Result.failure(IllegalArgumentException("Invalid code"))
@@ -149,16 +151,26 @@ class FakeRequestRepository(
 
     override suspend fun skip(requestId: String) = _requests.update { l -> l.filterNot { it.id == requestId } }
 
-    override suspend fun simulateWin(bidId: String): Result<Trip> {
-        val bid = _bids.value.firstOrNull { it.id == bidId } ?: return Result.failure(NoSuchElementException())
+    override suspend fun simulateWin(bidId: String): Result<Trip> =
+        accepted(bidId, "t${System.nanoTime()}", "DP-${25900 + (0..99).random()}", -1)
+
+    override suspend fun accepted(bidId: String, tripId: String, tripCode: String, advancePaid: Int): Result<Trip> {
+        val bid = _bids.value.firstOrNull { it.id == bidId } ?: return Result.failure(NoSuchElementException("Unknown bid $bidId"))
+        tripRepo.trips.value.firstOrNull { it.id == tripId }?.let { return Result.success(it) } // idempotent (Pusher + FCM may both deliver)
         val won = bid.copy(status = BidStatus.WON)
         _bids.update { l -> policy.resolveAfterWin(won, l.map { if (it.id == bidId) won else it }) }
         val r = bid.request
-        val trip = Trip("t${System.nanoTime()}", "DP-${25900 + (0..99).random()}", r.vehicleType, r.from, r.to, r.slot, r.passengers, r.customer, bid.amount, bid.amount / 4, TripStatus.UPCOMING)
+        val trip = Trip(tripId, tripCode, r.vehicleType, r.from, r.to, r.slot, r.passengers, r.customer, bid.amount,
+            if (advancePaid >= 0) advancePaid else bid.amount / 4, TripStatus.UPCOMING)
         tripRepo.addTrip(trip)
         _requests.update { l -> l.map { if (it.id == r.id) it.copy(status = RequestStatus.ASSIGNED) else it } }
         return Result.success(trip)
     }
+
+    override suspend fun rejected(bidId: String) = _bids.update { l -> l.map { if (it.id == bidId && it.status == BidStatus.PENDING) it.copy(status = BidStatus.LOST) else it } }
+    override suspend fun upsertRequest(r: TripRequest) = _requests.update { l -> if (l.any { it.id == r.id }) l.map { if (it.id == r.id) r else it } else listOf(r) + l }
+    override suspend fun updateCompetition(requestId: String, bidCount: Int) =
+        _requests.update { l -> l.map { if (it.id == requestId) it.copy(bidsCount = maxOf(it.bidsCount, bidCount)) else it } }
 }
 
 class FakeEarningsRepository : EarningsRepository {
@@ -214,4 +226,13 @@ object ServiceLocator {
     val requests: RequestRepository by lazy { FakeRequestRepository(trips, slotPolicy) }
     val earnings: EarningsRepository by lazy { FakeEarningsRepository() }
     val profile: ProfileRepository by lazy { FakeProfileRepository() }
+    private val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+
+    /** Pusher when PUSHER_KEY is configured, otherwise the simulator. */
+    val realtime: com.durpalla.driver.realtime.RealtimeClient by lazy {
+        if (com.durpalla.driver.BuildConfig.PUSHER_KEY.isNotBlank())
+            com.durpalla.driver.realtime.PusherRealtimeClient(com.durpalla.driver.BuildConfig.PUSHER_KEY, com.durpalla.driver.BuildConfig.PUSHER_CLUSTER, com.durpalla.driver.BuildConfig.PUSHER_AUTH_URL)
+        else com.durpalla.driver.realtime.FakeRealtimeClient(appScope, { requests.requests.value.filter { it.status == RequestStatus.OPEN || it.status == RequestStatus.BIDDING } })
+    }
+    var botProtection: com.durpalla.driver.security.BotProtection = com.durpalla.driver.security.NoopBotProtection
 }

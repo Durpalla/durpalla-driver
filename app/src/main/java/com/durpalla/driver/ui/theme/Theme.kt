@@ -38,7 +38,7 @@ private val scheme = lightColorScheme(
     primary = DP.Primary500, onPrimary = Color.White,
     primaryContainer = DP.Primary100, onPrimaryContainer = DP.Primary700,
     secondary = DP.Accent, onSecondary = Color.White,
-    secondaryContainer = DP.AccentSoft, onSecondaryContainer = Color(0xFF7A3E00),
+    secondaryContainer = DP.Primary100, onSecondaryContainer = DP.Primary700,
     tertiary = DP.Logo,
     error = DP.Danger, errorContainer = DP.DangerSoft,
     background = DP.Bg, onBackground = DP.Ink,

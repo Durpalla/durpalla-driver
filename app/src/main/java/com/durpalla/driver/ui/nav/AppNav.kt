@@ -20,6 +20,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.DriverViewModel
+import com.durpalla.driver.ui.LiveBanner
+import com.durpalla.driver.ui.components.LiveBannerCard
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
 import com.durpalla.driver.ui.screens.*
 import com.durpalla.driver.ui.theme.DP
 
@@ -50,11 +54,16 @@ private fun NavHostController.tab(route: String) = navigate(route) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DriverApp(vm: DriverViewModel = viewModel()) {
+fun DriverApp(
+    vm: DriverViewModel = viewModel(),
+    deepLink: kotlinx.coroutines.flow.StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
+    onDeepLinkHandled: () -> Unit = {},
+) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
     val requests by vm.openRequests.collectAsStateWithLifecycle()
+    val allRequests by vm.requests.collectAsStateWithLifecycle()
     val bids by vm.bids.collectAsStateWithLifecycle()
     val trips by vm.trips.collectAsStateWithLifecycle()
     val predefined by vm.predefined.collectAsStateWithLifecycle()
@@ -69,6 +78,25 @@ fun DriverApp(vm: DriverViewModel = viewModel()) {
     val bidForm by vm.bidForm.collectAsStateWithLifecycle()
     val wd by vm.withdraw.collectAsStateWithLifecycle()
     val recon by vm.reconciliation.collectAsStateWithLifecycle()
+    val connection by vm.connection.collectAsStateWithLifecycle()
+    val live by vm.liveBids.collectAsStateWithLifecycle()
+    val banner by vm.banner.collectAsStateWithLifecycle()
+    val pending by deepLink.collectAsStateWithLifecycle()
+    // Notification tap -> route (only once logged in, i.e. a tab destination exists in the back stack).
+    LaunchedEffect(pending, current) {
+        val route = pending ?: return@LaunchedEffect
+        if (current != null && current !in setOf(Routes.SPLASH, Routes.LOGIN, Routes.OTP)) {
+            if (route.startsWith("requests")) nav.tab(Routes.REQUESTS) else nav.navigate(route)
+            onDeepLinkHandled()
+        }
+    }
+    // Android 13+ notification permission, asked once the driver reaches Home.
+    val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(current == Routes.HOME) {
+        if (current == Routes.HOME && android.os.Build.VERSION.SDK_INT >= 33 && !com.durpalla.driver.notifications.Notifier.canPost(ctx))
+            permLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
     // Recompute slot locks whenever trips change.
     val blockedFn: (TripRequest) -> Boolean = remember(trips) { { r -> vm.isSlotBlocked(r) } }
     var bidSheet by remember { mutableStateOf<Bid?>(null) }
@@ -84,6 +112,7 @@ fun DriverApp(vm: DriverViewModel = viewModel()) {
             }
         },
     ) { outer ->
+      Box(Modifier.fillMaxSize()) {
         NavHost(nav, startDestination = Routes.SPLASH, modifier = Modifier.padding(bottom = if (current in tabs.map { it.route }) outer.calculateBottomPadding() else 0.dp)) {
             composable(Routes.SPLASH) { SplashScreen { nav.navigate(Routes.LOGIN) { popUpTo(Routes.SPLASH) { inclusive = true } } } }
             composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.navigate(Routes.OTP) } } }
@@ -96,24 +125,23 @@ fun DriverApp(vm: DriverViewModel = viewModel()) {
                 HomeScreen(driver, online, vm::setOnline, summary, bids.count { it.status == BidStatus.PENDING },
                     trips.filter { it.status == TripStatus.UPCOMING }.minByOrNull { it.slot.start }, requests, blockedFn,
                     onNotifications = { nav.navigate(Routes.NOTIFS) }, onUpcoming = { nav.navigate(Routes.trip(it.id)) },
-                    onRequest = { nav.navigate(Routes.incoming(it.id)) }, onSkip = { vm.skip(it.id) }, onSeeAll = { nav.tab(Routes.REQUESTS) })
+                    onRequest = { nav.navigate(Routes.incoming(it.id)) }, onSkip = { vm.skip(it.id) }, onSeeAll = { nav.tab(Routes.REQUESTS) }, connection = connection)
             }
             composable(Routes.REQUESTS) {
-                RequestsScreen(requests, bids, blockedFn, 0, { nav.navigate(Routes.NOTIFS) }, { nav.navigate(Routes.incoming(it.id)) }, { bidSheet = it })
+                RequestsScreen(requests, bids, blockedFn, 0, { nav.navigate(Routes.NOTIFS) }, { nav.navigate(Routes.incoming(it.id)) }, { bidSheet = it }, connection)
             }
             composable(Routes.INCOMING) { e ->
-                val r = requests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
+                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
                 IncomingRequestScreen(r, vm.conflictFor(r), { nav.popBackStack() }, { vm.skip(r.id); nav.popBackStack() },
-                    { vm.resetBid(r.suggestedMin); nav.navigate(Routes.bid(r.id)) }, { nav.navigate(Routes.conflict(r.id)) })
+                    { vm.resetBid(r.suggestedMin); nav.navigate(Routes.bid(r.id)) }, { nav.navigate(Routes.conflict(r.id)) }, live[r.id], connection)
             }
             composable(Routes.BID) { e ->
-                val r = requests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
-                PlaceBidScreen(r, bidForm, vm::setBidAmount, vm::setBidNote, { nav.popBackStack() }, { vm.submitBid(r.id) }) {
-                    vm.resetBid(); nav.tab(Routes.REQUESTS)
-                }
+                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
+                PlaceBidScreen(r, bidForm, vm::setBidAmount, vm::setBidNote, { nav.popBackStack() }, { vm.submitBid(r.id) },
+                    onDone = { vm.resetBid(); nav.tab(Routes.REQUESTS) }, live = live[r.id], connection = connection)
             }
             composable(Routes.CONFLICT) { e ->
-                val r = requests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
+                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
                 SlotConflictScreen(r, vm.conflictFor(r), { nav.popBackStack() }) { nav.navigate(Routes.trip(it.id)) }
             }
             composable(Routes.BID_WON) { e ->
@@ -170,6 +198,19 @@ fun DriverApp(vm: DriverViewModel = viewModel()) {
             composable(Routes.NOTIFS) { NotificationsScreen(notifs) { nav.popBackStack() } }
             composable(Routes.SUPPORT) { SupportScreen { nav.popBackStack() } }
         }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = banner != null && current !in setOf(Routes.SPLASH, Routes.LOGIN, Routes.OTP),
+            enter = androidx.compose.animation.slideInVertically { -it } + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically { -it } + androidx.compose.animation.fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp),
+        ) {
+            banner?.let { b ->
+                LiveBannerCard(b, onOpen = { vm.dismissBanner(); if (b.route == "requests") nav.tab(Routes.REQUESTS) else nav.navigate(b.route) }, onDismiss = vm::dismissBanner)
+            }
+        }
+        // Auto-hide non-critical banners.
+        LaunchedEffect(banner) { if (banner != null && banner?.kind != LiveBanner.Kind.ACCEPTED) { kotlinx.coroutines.delay(6000); vm.dismissBanner() } }
+      }
     }
 
     bidSheet?.let { b ->
