@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.DurpallaDriver" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/primary_700</item>
+        <item name="android:windowBackground">@color/primary_500</item>
+    </style>
+</resources>
