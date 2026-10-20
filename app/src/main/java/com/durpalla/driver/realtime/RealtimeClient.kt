@@ -100,7 +100,7 @@ class FakeRealtimeClient(private val scope: CoroutineScope, private val openRequ
             val low = lowest[bid.requestId]
             if (low == null || bid.amount <= low + 200) {
                 _events.emit(RealtimeEvent.BidAccepted(bid.id, bid.requestId, "t-live-${bid.requestId}", "DP-${(25900..25999).random()}", bid.amount / 4))
-            } else _events.emit(RealtimeEvent.BidRejected(bid.id, bid.requestId, "Customer chose a lower bid"))
+            } else _events.emit(RealtimeEvent.BidRejected(bid.id, bid.requestId, ""))
         }
     }
 

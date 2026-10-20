@@ -1,5 +1,7 @@
 package com.durpalla.driver.ui
 
+import com.durpalla.driver.R
+import com.durpalla.driver.i18n.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.durpalla.driver.data.*
@@ -9,17 +11,18 @@ import kotlinx.coroutines.launch
 import com.durpalla.driver.realtime.*
 import com.durpalla.driver.security.BotProtection
 
-data class LiveBanner(val kind: Kind, val title: String, val body: String, val route: String) {
+data class LiveBanner(val kind: Kind, val title: UiText, val body: UiText, val route: String) {
     enum class Kind { ACCEPTED, REQUEST, INFO, WARNING }
 }
 
-data class AuthState(val phone: String = "", val loading: Boolean = false, val error: String? = null, val kycType: VehicleType = VehicleType.SPEEDBOAT, val uploaded: Set<String> = emptySet())
+data class AuthState(val phone: String = "", val loading: Boolean = false, val error: UiText? = null, val kycType: VehicleType = VehicleType.SPEEDBOAT, val uploaded: Set<String> = emptySet())
 
-data class BidFormState(val amount: String = "", val note: String = "", val error: String? = null, val submitting: Boolean = false, val submitted: Bid? = null) {
-    val amountInt: Int? get() = amount.toIntOrNull()
+/** [amount] is always ASCII digits (normalised on input), so parsing never depends on locale. */
+data class BidFormState(val amount: String = "", val note: String = "", val error: UiText? = null, val submitting: Boolean = false, val submitted: Bid? = null) {
+    val amountInt: Int? get() = DigitFormatter.parseInt(amount)
 }
 
-data class WithdrawState(val account: WithdrawAccount? = null, val amount: String = "", val pin: String = "", val error: String? = null, val loading: Boolean = false, val done: WalletTx? = null)
+data class WithdrawState(val account: WithdrawAccount? = null, val amount: String = "", val pin: String = "", val error: UiText? = null, val loading: Boolean = false, val done: WalletTx? = null)
 
 /**
  * Shared screen state for the whole driver app. Screens themselves are stateless composables
@@ -55,16 +58,16 @@ class DriverViewModel(
     internal suspend fun onEvent(e: RealtimeEvent) {
         _live.update { BidReducer.reduce(it, e) }
         when (e) {
-            is RealtimeEvent.TripRequested -> { requestRepo.upsertRequest(e.request); _banner.value = LiveBanner(LiveBanner.Kind.REQUEST, "New ${e.request.vehicleType.label} request", "${e.request.from} → ${e.request.to} · ${e.request.passengers} pax", "request/${e.request.id}") }
+            is RealtimeEvent.TripRequested -> { requestRepo.upsertRequest(e.request); _banner.value = LiveBanner(LiveBanner.Kind.REQUEST, UiText.res(R.string.banner_new_request, UiText.res(e.request.vehicleType.res)), UiText.res(R.string.dot_join, UiText.res(R.string.route_from_to, e.request.from, e.request.to), UiText.plural(R.plurals.pax, e.request.passengers, e.request.passengers)), "request/${e.request.id}") }
             is RealtimeEvent.BidPlaced -> requestRepo.updateCompetition(e.requestId, e.bidCount)
             is RealtimeEvent.BidUpdated -> requestRepo.updateCompetition(e.requestId, e.bidCount)
             is RealtimeEvent.BidAccepted -> requestRepo.accepted(e.bidId, e.tripId, e.tripCode, e.advancePaid).onSuccess { t ->
                 realtime.watchTrip(t.id)
-                _banner.value = LiveBanner(LiveBanner.Kind.ACCEPTED, "Customer accepted your bid!", "${t.from} → ${t.to} · ${taka(t.fare)} · slot locked", "won/${t.id}")
+                _banner.value = LiveBanner(LiveBanner.Kind.ACCEPTED, UiText.res(R.string.banner_accepted), UiText.res(R.string.banner_accepted_body, t.from, t.to, UiText.Taka(t.fare)), "won/${t.id}")
             }
-            is RealtimeEvent.BidRejected -> { requestRepo.rejected(e.bidId); _banner.value = LiveBanner(LiveBanner.Kind.INFO, "Bid not selected", e.reason, "requests") }
-            is RealtimeEvent.TripCancelled -> { tripRepo.updateStatus(e.tripId, TripStatus.CANCELLED); _banner.value = LiveBanner(LiveBanner.Kind.WARNING, "Trip cancelled", e.reason, "trip/${e.tripId}") }
-            is RealtimeEvent.PaymentReceived -> _banner.value = LiveBanner(LiveBanner.Kind.INFO, "Payment received", "${taka(e.amount)} via ${e.method.label}", "wallet")
+            is RealtimeEvent.BidRejected -> { requestRepo.rejected(e.bidId); _banner.value = LiveBanner(LiveBanner.Kind.INFO, UiText.res(R.string.banner_not_selected), reasonText(e.reason, R.string.reason_other_driver), "requests") }
+            is RealtimeEvent.TripCancelled -> { tripRepo.updateStatus(e.tripId, TripStatus.CANCELLED); _banner.value = LiveBanner(LiveBanner.Kind.WARNING, UiText.res(R.string.banner_cancelled), reasonText(e.reason, R.string.reason_cancelled_customer), "trip/${e.tripId}") }
+            is RealtimeEvent.PaymentReceived -> _banner.value = LiveBanner(LiveBanner.Kind.INFO, UiText.res(R.string.banner_payment), UiText.res(R.string.banner_payment_body, UiText.Taka(e.amount), UiText.res(e.method.res)), "wallet")
             is RealtimeEvent.SlotLocked, is RealtimeEvent.SlotReleased -> Unit // server-side lock mirrors local trips; refresh trips from API here
         }
     }
@@ -97,17 +100,18 @@ class DriverViewModel(
     // ---- Auth
     private val _auth = MutableStateFlow(AuthState())
     val authState: StateFlow<AuthState> = _auth
-    fun setPhone(p: String) = _auth.update { it.copy(phone = p.filter(Char::isDigit).take(11), error = null) }
+    /** Accepts Bangla (০-৯) or ASCII input; state and API always get ASCII. */
+    fun setPhone(p: String) = _auth.update { it.copy(phone = DigitFormatter.digitsOnly(p, 11), error = null) }
     fun sendOtp(onOk: () -> Unit) = viewModelScope.launch {
-        if (_auth.value.phone.length != 11) { _auth.update { it.copy(error = "Enter an 11-digit mobile number") }; return@launch }
+        if (_auth.value.phone.length != 11) { _auth.update { it.copy(error = UiText.res(R.string.err_phone)) }; return@launch }
         _auth.update { it.copy(loading = true) }
         val captcha = bot().token(BotProtection.LOGIN) // reCAPTCHA Enterprise; null when disabled
         auth.requestOtp(_auth.value.phone, captcha)
             .onSuccess { _auth.update { it.copy(loading = false) }; onOk() }
-            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.message) } }
+            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
     }
     fun verifyOtp(code: String, onOk: (kycDone: Boolean) -> Unit) = viewModelScope.launch {
-        auth.verifyOtp(_auth.value.phone, code).onSuccess(onOk).onFailure { e -> _auth.update { it.copy(error = e.message) } }
+        auth.verifyOtp(_auth.value.phone, DigitFormatter.digitsOnly(code, 6)).onSuccess(onOk).onFailure { e -> _auth.update { it.copy(error = e.toUiText(R.string.err_otp)) } }
     }
     fun setKycType(t: VehicleType) = _auth.update { it.copy(kycType = t) }
     fun toggleDoc(d: String) = _auth.update { it.copy(uploaded = if (d in it.uploaded) it.uploaded - d else it.uploaded + d) }
@@ -116,12 +120,12 @@ class DriverViewModel(
     // ---- Bidding
     private val _bid = MutableStateFlow(BidFormState())
     val bidForm: StateFlow<BidFormState> = _bid
-    fun resetBid(prefill: Int? = null) { _bid.value = BidFormState(amount = prefill?.toString() ?: "") }
-    fun setBidAmount(v: String) = _bid.update { it.copy(amount = v.filter(Char::isDigit).take(6), error = null) }
+    fun resetBid(prefill: Int? = null) { _bid.value = BidFormState(amount = prefill?.let { Integer.toString(it) } ?: "") }
+    fun setBidAmount(v: String) = _bid.update { it.copy(amount = DigitFormatter.digitsOnly(v, 6), error = null) }
     fun setBidNote(v: String) = _bid.update { it.copy(note = v.take(140)) }
     fun submitBid(requestId: String) = viewModelScope.launch {
         val f = _bid.value
-        val amt = f.amountInt ?: run { _bid.update { it.copy(error = "Enter a rent amount") }; return@launch }
+        val amt = f.amountInt ?: run { _bid.update { it.copy(error = UiText.res(R.string.err_rent)) }; return@launch }
         _bid.update { it.copy(submitting = true) }
         requestRepo.placeBid(requestId, amt, f.note)
             .onSuccess { b ->
@@ -129,7 +133,7 @@ class DriverViewModel(
                 _live.update { BidReducer.myBid(it, requestId, b.id, b.amount) }
                 realtime.onOwnBidPlaced(b)
             }
-            .onFailure { e -> _bid.update { it.copy(submitting = false, error = e.message) } }
+            .onFailure { e -> _bid.update { it.copy(submitting = false, error = e.toUiText(R.string.err_generic)) } }
     }
     fun skip(requestId: String) = viewModelScope.launch { requestRepo.skip(requestId) }
     fun simulateWin(bidId: String, onTrip: (Trip) -> Unit) = viewModelScope.launch { requestRepo.simulateWin(bidId).onSuccess(onTrip) }
@@ -148,14 +152,14 @@ class DriverViewModel(
     val withdraw: StateFlow<WithdrawState> = _wd
     fun resetWithdraw() { _wd.value = WithdrawState(account = earningsRepo.accounts.first()) }
     fun setWdAccount(a: WithdrawAccount) = _wd.update { it.copy(account = a) }
-    fun setWdAmount(v: String) = _wd.update { it.copy(amount = v.filter(Char::isDigit).take(7), error = null) }
-    fun setPin(v: String) = _wd.update { it.copy(pin = v.filter(Char::isDigit).take(4), error = null) }
+    fun setWdAmount(v: String) = _wd.update { it.copy(amount = DigitFormatter.digitsOnly(v, 7), error = null) }
+    fun setPin(v: String) = _wd.update { it.copy(pin = DigitFormatter.digitsOnly(v, 4), error = null) }
     fun confirmWithdraw() = viewModelScope.launch {
         val s = _wd.value
         val acc = s.account ?: return@launch
         _wd.update { it.copy(loading = true) }
-        earningsRepo.withdraw(acc, s.amount.toIntOrNull() ?: 0, s.pin)
+        earningsRepo.withdraw(acc, DigitFormatter.parseInt(s.amount) ?: 0, DigitFormatter.digitsOnly(s.pin, 4))
             .onSuccess { tx -> _wd.update { it.copy(loading = false, done = tx) } }
-            .onFailure { e -> _wd.update { it.copy(loading = false, error = e.message) } }
+            .onFailure { e -> _wd.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
     }
 }

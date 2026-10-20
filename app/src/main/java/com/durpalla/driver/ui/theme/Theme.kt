@@ -11,6 +11,15 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.LineHeightStyle
+import com.durpalla.driver.R
+import com.durpalla.driver.i18n.AppLocale
 
 object DP {
     // Driver-app primary (deeper teal-blue, distinct from customer app)
@@ -47,22 +56,36 @@ private val scheme = lightColorScheme(
     outline = DP.Line, outlineVariant = DP.Line,
 )
 
-private val typography = Typography(
-    headlineMedium = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
-    titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 15.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp),
-    bodySmall = TextStyle(fontSize = 12.sp),
-    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium),
-)
+/** SolaimanLipi (Ekushey / OmicronLab, SIL OFL 1.0) for Bangla. Single regular cut; bold is synthesized. */
+val SolaimanLipi = FontFamily(Font(R.font.solaiman_lipi, FontWeight.Normal))
+
+private fun typography(bangla: Boolean): Typography {
+    val family = if (bangla) SolaimanLipi else FontFamily.Default
+    // Bangla needs more vertical room so matras (e.g. ি ী ু ূ) and conjuncts are not clipped.
+    val lh = if (bangla) 1.5f else 1.3f
+    fun st(size: Int, w: FontWeight = FontWeight.Normal) = TextStyle(
+        fontFamily = family, fontSize = size.sp, fontWeight = w, lineHeight = lh.em, // em: scales with any fontSize override
+        platformStyle = PlatformTextStyle(includeFontPadding = bangla),
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+    )
+    return Typography(
+        displaySmall = st(34, FontWeight.Bold), headlineLarge = st(30, FontWeight.Bold),
+        headlineMedium = st(26, FontWeight.Bold), headlineSmall = st(22, FontWeight.Bold),
+        titleLarge = st(20, FontWeight.Bold), titleMedium = st(16, FontWeight.SemiBold), titleSmall = st(14, FontWeight.SemiBold),
+        bodyLarge = st(15), bodyMedium = st(14), bodySmall = st(12),
+        labelLarge = st(14, FontWeight.SemiBold), labelMedium = st(12, FontWeight.Medium), labelSmall = st(11, FontWeight.Medium),
+    )
+}
+private val typographyEn = typography(false)
+private val typographyBn = typography(true)
 
 private val shapes = Shapes(
     small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(20.dp),
 )
 
 @Composable
-fun DurpallaTheme(content: @Composable () -> Unit) =
-    MaterialTheme(colorScheme = scheme, typography = typography, shapes = shapes, content = content)
+fun DurpallaTheme(bangla: Boolean = AppLocale.isBangla, content: @Composable () -> Unit) =
+    MaterialTheme(colorScheme = scheme, typography = if (bangla) typographyBn else typographyEn, shapes = shapes) {
+        // Text() calls that set only fontSize still inherit the family + line height from LocalTextStyle.
+        CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.bodyMedium, content = content)
+    }

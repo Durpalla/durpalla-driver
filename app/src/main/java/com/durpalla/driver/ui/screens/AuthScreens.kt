@@ -1,5 +1,12 @@
 package com.durpalla.driver.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.durpalla.driver.ui.str
+import com.durpalla.driver.ui.title
+import com.durpalla.driver.i18n.l
+import com.durpalla.driver.i18n.toLocalDigits
+import com.durpalla.driver.i18n.DigitFormatter
+import com.durpalla.driver.i18n.asString
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,13 +47,13 @@ fun SplashScreen(onContinue: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(120.dp).clip(RoundedCornerShape(32.dp)).background(Color.White), contentAlignment = Alignment.Center) {
-                Image(painterResource(R.drawable.durpalla_icon), "Durpalla", Modifier.size(96.dp))
+                Image(painterResource(R.drawable.durpalla_icon), stringResource(R.string.brand_durpalla), Modifier.size(96.dp))
             }
             Spacer(Modifier.height(20.dp))
-            Text("durpalla", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-            Text("Driver · Boat · Taxi · Micro", color = DP.Primary200)
+            Text(stringResource(R.string.brand_wordmark), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.splash_tagline), color = DP.Primary200)
         }
-        Text("Tap to continue · Durpalla Limited", color = DP.Primary200, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp))
+        Text(stringResource(R.string.splash_tap), color = DP.Primary200, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp))
     }
 }
 
@@ -60,18 +67,18 @@ fun KycStepper(step: Int) {
 
 @Composable
 fun KycVehicleScreen(selected: VehicleType, onSelect: (VehicleType) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
-    Scaffold(topBar = { DTopBar("Driver verification", onBack) }, bottomBar = { StickyCta { PrimaryButton("Continue", onNext) } }) { pad ->
+    Scaffold(topBar = { DTopBar(stringResource(R.string.kyc_title), onBack) }, bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.cont), onNext) } }) { pad ->
         ScreenColumn(pad) {
             KycStepper(0)
-            Text("What do you drive?", style = MaterialTheme.typography.titleLarge)
-            Text("You'll only get requests for this vehicle type. You can add more vehicles later.", color = DP.Muted)
+            Text(stringResource(R.string.kyc_what), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.kyc_what_sub), color = DP.Muted)
             VehicleType.entries.forEach { t ->
                 DCard(onClick = { onSelect(t) }, border = if (t == selected) DP.Primary500 else DP.Line, color = if (t == selected) DP.Primary100 else Color.White) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         VehicleBadge(t)
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text(t.label, style = MaterialTheme.typography.titleMedium)
-                            Text(when (t) { VehicleType.SPEEDBOAT -> "River routes · 6–12 seats"; VehicleType.BOAT -> "Trawler / engine boat · up to 30"; VehicleType.TAXI -> "Sedan · up to 4"; VehicleType.MICROBUS -> "Hiace / Noah · 7–11 seats" }, color = DP.Muted, style = MaterialTheme.typography.bodySmall)
+                            Text(t.title(), style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(when (t) { VehicleType.SPEEDBOAT -> R.string.vt_desc_speedboat; VehicleType.BOAT -> R.string.vt_desc_boat; VehicleType.TAXI -> R.string.vt_desc_taxi; VehicleType.MICROBUS -> R.string.vt_desc_microbus }), color = DP.Muted, style = MaterialTheme.typography.bodySmall)
                         }
                         RadioButton(selected = t == selected, onClick = { onSelect(t) })
                     }
@@ -81,21 +88,22 @@ fun KycVehicleScreen(selected: VehicleType, onSelect: (VehicleType) -> Unit, onB
     }
 }
 
-val kycDocs = listOf("National ID (front & back)", "Driving / Master licence", "Vehicle registration", "Fitness / route permit", "Selfie with NID")
+/** API document keys (ASCII) with their translated labels. */
+val kycDocs = listOf("nid" to R.string.doc_nid, "licence" to R.string.doc_licence, "registration" to R.string.doc_reg, "fitness" to R.string.doc_fitness, "selfie" to R.string.doc_selfie)
 
 @Composable
 fun KycDocumentsScreen(uploaded: Set<String>, onToggle: (String) -> Unit, onBack: () -> Unit, onSubmit: () -> Unit) {
-    Scaffold(topBar = { DTopBar("Upload documents", onBack) }, bottomBar = { StickyCta { PrimaryButton("Submit for review", onSubmit, enabled = uploaded.size >= 3) } }) { pad ->
+    Scaffold(topBar = { DTopBar(stringResource(R.string.kyc_docs_title), onBack) }, bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.kyc_submit), onSubmit, enabled = uploaded.size >= 3) } }) { pad ->
         ScreenColumn(pad) {
             KycStepper(1)
-            Text("Clear photos, all corners visible. Reviewed within 24 hours.", color = DP.Muted)
-            kycDocs.forEach { d ->
+            Text(stringResource(R.string.kyc_docs_sub), color = DP.Muted)
+            kycDocs.forEach { (d, label) ->
                 val done = d in uploaded
                 DCard(onClick = { onToggle(d) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(if (done) Icons.Filled.CheckCircle else Icons.Filled.UploadFile, null, tint = if (done) DP.Success else DP.Primary500)
-                        Text(d, Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.titleSmall)
-                        StatusChip(if (done) "Uploaded" else "Upload", if (done) Tone.SUCCESS else Tone.PRIMARY)
+                        Text(stringResource(label), Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.titleSmall)
+                        StatusChip(stringResource(if (done) R.string.uploaded else R.string.upload), if (done) Tone.SUCCESS else Tone.PRIMARY)
                     }
                 }
             }
@@ -105,7 +113,7 @@ fun KycDocumentsScreen(uploaded: Set<String>, onToggle: (String) -> Unit, onBack
 
 @Composable
 fun KycReviewScreen(onContinue: () -> Unit) {
-    Scaffold(bottomBar = { StickyCta { PrimaryButton("Explore the app (demo)", onContinue) } }) { pad ->
+    Scaffold(bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.kyc_explore), onContinue) } }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             KycStepper(2)
             Spacer(Modifier.height(40.dp))
@@ -113,10 +121,11 @@ fun KycReviewScreen(onContinue: () -> Unit) {
                 Icon(Icons.Filled.HourglassTop, null, tint = DP.Warning, modifier = Modifier.size(48.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Text("Documents under review", style = MaterialTheme.typography.headlineSmall)
-            Text("We'll notify you by SMS once your account is verified, usually within 24 hours.", color = DP.Muted, textAlign = TextAlign.Center)
+            Text(stringResource(R.string.kyc_review_title), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.kyc_review_sub), color = DP.Muted, textAlign = TextAlign.Center)
             Spacer(Modifier.height(16.dp))
-            DCard { KeyValue("NID", "Under review"); KeyValue("Licence", "Under review"); KeyValue("Vehicle", "Under review") }
+            val ur = stringResource(R.string.under_review)
+            DCard { KeyValue(stringResource(R.string.kyc_nid), ur); KeyValue(stringResource(R.string.kyc_licence), ur); KeyValue(stringResource(R.string.vehicle), ur) }
         }
     }
 }
@@ -125,5 +134,5 @@ fun KycReviewScreen(onContinue: () -> Unit) {
 @PhonePreview @Composable private fun LoginPreview() = P { PhoneLoginScreen(AuthState(phone = "01711234567"), {}, {}) }
 @PhonePreview @Composable private fun OtpPreview() = P { OtpScreen("01711234567", null, {}, {}) }
 @PhonePreview @Composable private fun KycVehiclePreview() = P { KycVehicleScreen(VehicleType.SPEEDBOAT, {}, {}, {}) }
-@PhonePreview @Composable private fun KycDocsPreview() = P { KycDocumentsScreen(setOf(kycDocs[0]), {}, {}, {}) }
+@PhonePreview @Composable private fun KycDocsPreview() = P { KycDocumentsScreen(setOf(kycDocs[0].first), {}, {}, {}) }
 @PhonePreview @Composable private fun KycReviewPreview() = P { KycReviewScreen {} }

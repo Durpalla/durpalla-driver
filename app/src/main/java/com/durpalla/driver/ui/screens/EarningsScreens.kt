@@ -1,5 +1,15 @@
 package com.durpalla.driver.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.durpalla.driver.R
+import com.durpalla.driver.ui.str
+import com.durpalla.driver.ui.plural
+import com.durpalla.driver.ui.title
+import com.durpalla.driver.i18n.l
+import com.durpalla.driver.i18n.toLocalDigits
+import com.durpalla.driver.i18n.DigitFormatter
+import com.durpalla.driver.i18n.asString
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -46,38 +56,38 @@ fun BarChart(data: List<Pair<String, Int>>, modifier: Modifier = Modifier) {
                 )
             }
         }
-        Row { data.forEach { Text(it.first, Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp, color = DP.Muted) } }
+        Row { data.forEach { Text(it.first.toLocalDigits(), Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp, color = DP.Muted) } }
     }
 }
 
 @Composable
 fun EarningsScreen(s: EarningsSummary, onWithdraw: () -> Unit, onWallet: () -> Unit, onRecon: () -> Unit, onRatings: () -> Unit, rating: Double) {
     var range by rememberSaveable { mutableIntStateOf(1) }
-    Scaffold(topBar = { DTopBar("Earnings") }) { pad ->
+    Scaffold(topBar = { DTopBar(stringResource(R.string.earnings)) }) { pad ->
         ScreenColumn(pad) {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(DP.Primary500, DP.Primary700))).padding(16.dp)) {
-                Text("WALLET BALANCE", color = DP.Primary200, fontSize = 11.sp)
+                Text(stringResource(R.string.wallet_balance_caps), color = DP.Primary200, fontSize = 11.sp)
                 Text(taka(s.walletBalance), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Row { Text("Pending settlement ${taka(s.pendingSettlement)}", color = DP.Primary200, fontSize = 12.sp, modifier = Modifier.weight(1f)); Text("Next payout ${s.nextPayout}", color = DP.Primary200, fontSize = 12.sp) }
+                Row { Text(str(R.string.pending_settlement_x, taka(s.pendingSettlement)), color = DP.Primary200, fontSize = 12.sp, modifier = Modifier.weight(1f)); Text(str(R.string.next_payout_x, s.nextPayout), color = DP.Primary200, fontSize = 12.sp) }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PrimaryButton("Withdraw", onWithdraw, Modifier.weight(1f), accent = true)
-                    DurpallaButton("Transactions", onWallet, Modifier.weight(1f), ButtonVariant.OnDark)
+                    PrimaryButton(stringResource(R.string.withdraw), onWithdraw, Modifier.weight(1f), accent = true)
+                    DurpallaButton(stringResource(R.string.transactions), onWallet, Modifier.weight(1f), ButtonVariant.OnDark)
                 }
             }
-            SegmentedTabs(listOf("Day", "Week", "Month"), range, { range = it })
+            SegmentedTabs(listOf(stringResource(R.string.seg_day), stringResource(R.string.seg_week), stringResource(R.string.seg_month)), range, { range = it })
             DCard {
-                Row { Text("This week", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); Text("${taka(s.weekTotal)} ▲${s.weekChangePct}%", color = DP.Success, fontWeight = FontWeight.Bold) }
+                Row { Text(stringResource(R.string.this_week), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); Text(str(R.string.week_change, taka(s.weekTotal), s.weekChangePct), color = DP.Success, fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(12.dp)); BarChart(s.daily)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("Trips", "${s.weekTrips}", Modifier.weight(1f))
-                StatTile("Commission", taka(s.weekCommission), Modifier.weight(1f), DP.Danger)
-                Box(Modifier.weight(1f)) { StatTile("Rating", "$rating ★", valueColor = DP.Accent) }
+                StatTile(stringResource(R.string.trips), s.weekTrips.l(), Modifier.weight(1f))
+                StatTile(stringResource(R.string.commission), taka(s.weekCommission), Modifier.weight(1f), DP.Danger)
+                Box(Modifier.weight(1f)) { StatTile(stringResource(R.string.rating), str(R.string.rating_star, num(rating)), valueColor = DP.Accent) }
             }
             DCard {
-                MenuRow(Icons.Filled.ReceiptLong, "Reconciliation & statements", "Trips vs payouts · commission", onClick = onRecon)
-                MenuRow(Icons.Filled.Star, "Ratings & reviews", onClick = onRatings)
+                MenuRow(Icons.Filled.ReceiptLong, stringResource(R.string.recon_menu), stringResource(R.string.recon_menu_sub), onClick = onRecon)
+                MenuRow(Icons.Filled.Star, stringResource(R.string.ratings_reviews), onClick = onRatings)
             }
         }
     }
@@ -87,25 +97,25 @@ fun EarningsScreen(s: EarningsSummary, onWithdraw: () -> Unit, onWallet: () -> U
 @Composable
 fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawState, onAccount: (WithdrawAccount) -> Unit, onAmount: (String) -> Unit, onPin: (String) -> Unit, onConfirm: () -> Unit, onBack: () -> Unit) {
     var showPin by remember { mutableStateOf(false) }
-    val amt = st.amount.toIntOrNull() ?: 0
-    Scaffold(topBar = { DTopBar("Withdraw", onBack) }, bottomBar = { StickyCta { PrimaryButton("Continue", { showPin = true }, enabled = amt in 500..balance, accent = true) } }) { pad ->
+    val amt = DigitFormatter.parseInt(st.amount) ?: 0
+    Scaffold(topBar = { DTopBar(stringResource(R.string.withdraw), onBack) }, bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.cont), { showPin = true }, enabled = amt in 500..balance, accent = true) } }) { pad ->
         ScreenColumn(pad) {
-            DCard(color = DP.Primary100, border = null) { Text("Available balance", color = DP.Primary600, fontSize = 12.sp); Text(taka(balance), style = MaterialTheme.typography.headlineSmall, color = DP.Primary700) }
-            Text("Send to", style = MaterialTheme.typography.titleSmall)
+            DCard(color = DP.Primary100, border = null) { Text(stringResource(R.string.available_balance), color = DP.Primary600, fontSize = 12.sp); Text(taka(balance), style = MaterialTheme.typography.headlineSmall, color = DP.Primary700) }
+            Text(stringResource(R.string.send_to), style = MaterialTheme.typography.titleSmall)
             accounts.forEach { a ->
                 DCard(onClick = { onAccount(a) }, border = if (a == st.account) DP.Primary500 else DP.Line) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(when (a.method) { PaymentMethod.BKASH -> Color(0xFFE2136E); PaymentMethod.NAGAD -> Color(0xFFF6921E); else -> DP.Primary500 }), contentAlignment = Alignment.Center) {
-                            Text(a.method.label.take(1), color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(a.method.title().take(1), color = Color.White, fontWeight = FontWeight.Bold)
                         }
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(a.method.label, style = MaterialTheme.typography.titleSmall); Text(a.account, color = DP.Muted, fontSize = 12.sp) }
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(a.method.title(), style = MaterialTheme.typography.titleSmall); Text(a.account.toLocalDigits(), color = DP.Muted, fontSize = 12.sp) }
                         RadioButton(a == st.account, { onAccount(a) })
                     }
                 }
             }
-            OutlinedTextField(st.amount, onAmount, label = { Text("Amount") }, prefix = { Text("৳ ") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), supportingText = { Text("Min ৳500 · free for bKash/Nagad, ৳10 for bank") }, shape = RoundedCornerShape(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(1000, 5000, balance).forEach { v -> DurpallaButton(if (v == balance) "All" else taka(v), { onAmount(v.toString()) }, variant = ButtonVariant.Secondary, size = ButtonSize.Small, fillWidth = false) } }
+            OutlinedTextField(st.amount.toLocalDigits(), onAmount, label = { Text(stringResource(R.string.amount)) }, prefix = { Text(stringResource(R.string.taka_prefix)) }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), supportingText = { Text(str(R.string.withdraw_hint, num(500), num(10))) }, shape = RoundedCornerShape(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(1000, 5000, balance).forEach { v -> DurpallaButton(if (v == balance) stringResource(R.string.all) else taka(v), { onAmount(v.toString()) }, variant = ButtonVariant.Secondary, size = ButtonSize.Small, fillWidth = false) } }
         }
     }
     if (showPin && st.done == null) {
@@ -113,13 +123,13 @@ fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawSt
         val scope = rememberCoroutineScope()
         ModalBottomSheet(onDismissRequest = { showPin = false }, sheetState = sheet, containerColor = Color.White) {
             Column(Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Enter wallet PIN", style = MaterialTheme.typography.titleLarge)
-                Text("Withdraw ${taka(amt)} to ${st.account?.method?.label} ${st.account?.account}", color = DP.Muted)
-                OutlinedTextField(st.pin, onPin, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                Text(stringResource(R.string.enter_pin), style = MaterialTheme.typography.titleLarge)
+                Text(str(R.string.withdraw_to, taka(amt), st.account?.method?.title() ?: "", st.account?.account ?: ""), color = DP.Muted)
+                OutlinedTextField(st.pin.toLocalDigits(), onPin, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), textStyle = LocalTextStyle.current.copy(fontSize = 24.sp, letterSpacing = 16.sp, textAlign = TextAlign.Center),
-                    isError = st.error != null, supportingText = { st.error?.let { Text(it) } })
-                PrimaryButton(if (st.loading) "Processing…" else "Confirm withdraw", onConfirm, enabled = st.pin.length == 4, accent = true, loading = st.loading)
-                DurpallaButton("Cancel", { scope.launch { sheet.hide(); showPin = false } }, variant = ButtonVariant.Text)
+                    isError = st.error != null, supportingText = { st.error?.let { Text(it.asString()) } })
+                PrimaryButton(stringResource(if (st.loading) R.string.processing else R.string.confirm_withdraw), onConfirm, enabled = st.pin.length == 4, accent = true, loading = st.loading)
+                DurpallaButton(stringResource(R.string.cancel), { scope.launch { sheet.hide(); showPin = false } }, variant = ButtonVariant.Text)
             }
         }
     }
@@ -127,13 +137,13 @@ fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawSt
 
 @Composable
 fun WithdrawSuccessScreen(tx: WalletTx, account: WithdrawAccount?, onDone: () -> Unit) {
-    Scaffold(bottomBar = { StickyCta { PrimaryButton("Back to earnings", onDone) } }) { pad ->
+    Scaffold(bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.back_earnings), onDone) } }) { pad ->
         Column(Modifier.fillMaxSize().background(DP.Bg).padding(pad).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Spacer(Modifier.height(40.dp))
             Icon(Icons.Filled.CheckCircle, null, tint = DP.Success, modifier = Modifier.size(88.dp))
-            Text("Withdrawal requested", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.withdraw_requested), style = MaterialTheme.typography.headlineSmall)
             Text(taka(-tx.amount), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = DP.Primary500)
-            DCard { KeyValue("To", "${account?.method?.label} ${account?.account}"); KeyValue("Reference", tx.id.takeLast(8).uppercase()); KeyValue("ETA", "Within 30 minutes") }
+            DCard { KeyValue(stringResource(R.string.to), "${account?.method?.title() ?: ""} ${account?.account ?: ""}"); KeyValue(stringResource(R.string.reference), tx.id.takeLast(8).uppercase(java.util.Locale.ROOT)); KeyValue(stringResource(R.string.eta), stringResource(R.string.within_30)) }
         }
     }
 }
@@ -141,29 +151,33 @@ fun WithdrawSuccessScreen(tx: WalletTx, account: WithdrawAccount?, onDone: () ->
 @Composable
 fun ReconciliationScreen(r: Reconciliation?, onPeriod: (String) -> Unit, onBack: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(1) }
-    val periods = listOf("This week", "October 2026", "Custom")
-    LaunchedEffect(tab) { onPeriod(periods[tab]) }
+    // API period keys stay English/ASCII; only the tab labels are translated.
+    val now = java.time.YearMonth.now()
+    val periodKeys = listOf("this_week", "%04d-%02d".format(java.util.Locale.ROOT, now.year, now.monthValue), "custom")
+    val periods = listOf(stringResource(R.string.period_week), monthText(now.monthValue, now.year), stringResource(R.string.period_custom))
+    LaunchedEffect(tab) { onPeriod(periodKeys[tab]) }
+    val ctx = LocalContext.current
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    Scaffold(topBar = { DTopBar("Reconciliation", onBack) }, snackbarHost = { SnackbarHost(snack) }) { pad ->
+    Scaffold(topBar = { DTopBar(stringResource(R.string.reconciliation), onBack) }, snackbarHost = { SnackbarHost(snack) }) { pad ->
         ScreenColumn(pad) {
             SegmentedTabs(periods, tab, { tab = it })
             if (r == null) { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return@ScreenColumn }
             DCard {
-                KeyValue("Completed trips", "${r.completedTrips}")
-                KeyValue("Gross fare", taka(r.gross), bold = true)
-                KeyValue("Durpalla commission (${Commission.RATE_PERCENT}%)", "-" + taka(r.commission), DP.Danger)
-                KeyValue("Net earnings", taka(r.net), DP.Success, true)
-                KeyValue("Paid out (${r.withdrawals} withdrawals)", "-" + taka(r.paidOut))
-                KeyValue("Cash collected (commission due ${taka(r.commissionDueOnCash)})", "-" + taka(r.cashCollected), DP.Warning)
+                KeyValue(stringResource(R.string.completed_trips), r.completedTrips.l())
+                KeyValue(stringResource(R.string.gross_fare), taka(r.gross), bold = true)
+                KeyValue(str(R.string.durpalla_commission_pct, Commission.RATE_PERCENT), "-" + taka(r.commission), DP.Danger)
+                KeyValue(stringResource(R.string.net_earnings), taka(r.net), DP.Success, true)
+                KeyValue(plural(R.plurals.withdrawals_count, r.withdrawals), "-" + taka(r.paidOut))
+                KeyValue(str(R.string.cash_collected, taka(r.commissionDueOnCash)), "-" + taka(r.cashCollected), DP.Warning)
                 HorizontalDivider(color = DP.Line)
-                KeyValue("Pending settlement", taka(r.pendingSettlement), DP.Accent, true)
+                KeyValue(stringResource(R.string.pending_settlement), taka(r.pendingSettlement), DP.Accent, true)
             }
-            SectionHeader("Trip-wise")
-            DCard { r.lines.forEach { l -> KeyValue("${l.date} · ${l.code} · ${l.method.label}", "${taka(l.gross)} / -${taka(l.commission)}") } }
+            SectionHeader(stringResource(R.string.trip_wise))
+            DCard { r.lines.forEach { l -> KeyValue(str(R.string.dot_join3, l.date, l.code, l.method.title()), "${taka(l.gross)} / -${taka(l.commission)}") } }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryButton("PDF statement", { scope.launch { snack.showSnackbar("Statement downloaded · ${r.period}") } }, Modifier.weight(1f))
-                SecondaryButton("CSV", { scope.launch { snack.showSnackbar("CSV downloaded · ${r.period}") } }, Modifier.weight(1f))
+                SecondaryButton(stringResource(R.string.pdf_statement), { scope.launch { snack.showSnackbar(ctx.getString(R.string.statement_downloaded, periods[tab])) } }, Modifier.weight(1f))
+                SecondaryButton(stringResource(R.string.csv), { scope.launch { snack.showSnackbar(ctx.getString(R.string.csv_downloaded, periods[tab])) } }, Modifier.weight(1f))
             }
         }
     }
@@ -171,16 +185,16 @@ fun ReconciliationScreen(r: Reconciliation?, onPeriod: (String) -> Unit, onBack:
 
 @Composable
 fun WalletScreen(balance: Int, txs: List<WalletTx>, onBack: () -> Unit, onWithdraw: () -> Unit) {
-    Scaffold(topBar = { DTopBar("Wallet", onBack) }, bottomBar = { StickyCta { PrimaryButton("Withdraw", onWithdraw, accent = true) } }) { pad ->
+    Scaffold(topBar = { DTopBar(stringResource(R.string.wallet), onBack) }, bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.withdraw), onWithdraw, accent = true) } }) { pad ->
         ScreenColumn(pad) {
-            DCard(color = DP.Primary500, border = null) { Text("Balance", color = DP.Primary200); Text(taka(balance), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold) }
-            SectionHeader("Transactions")
+            DCard(color = DP.Primary500, border = null) { Text(stringResource(R.string.balance), color = DP.Primary200); Text(taka(balance), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold) }
+            SectionHeader(stringResource(R.string.transactions))
             DCard {
                 txs.forEach { t ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(when (t.type) { TxType.EARNING -> Icons.Filled.ArrowDownward; TxType.WITHDRAWAL -> Icons.Filled.ArrowUpward; TxType.COMMISSION -> Icons.Filled.Percent; TxType.ADJUSTMENT -> Icons.Filled.Tune }, null,
                             tint = if (t.amount >= 0) DP.Success else DP.Danger)
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(t.title, style = MaterialTheme.typography.titleSmall); Text("${t.date}", color = DP.Muted, fontSize = 12.sp) }
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(t.title.toLocalDigits(), style = MaterialTheme.typography.titleSmall); Text(dateText(t.date), color = DP.Muted, fontSize = 12.sp) }
                         Text((if (t.amount >= 0) "+" else "") + taka(t.amount), color = if (t.amount >= 0) DP.Success else DP.Danger, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -191,16 +205,16 @@ fun WalletScreen(balance: Int, txs: List<WalletTx>, onBack: () -> Unit, onWithdr
 
 @Composable
 fun RatingsScreen(avg: Double, ratings: List<Rating>, onBack: () -> Unit) {
-    Scaffold(topBar = { DTopBar("Ratings", onBack) }) { pad ->
+    Scaffold(topBar = { DTopBar(stringResource(R.string.ratings), onBack) }) { pad ->
         ScreenColumn(pad) {
             DCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("$avg", fontSize = 40.sp, fontWeight = FontWeight.Bold); Stars(avg.toInt()); Text("${ratings.size} reviews", color = DP.Muted, fontSize = 12.sp) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(num(avg), fontSize = 40.sp, fontWeight = FontWeight.Bold); Stars(avg.toInt()); Text(plural(R.plurals.reviews_count, ratings.size), color = DP.Muted, fontSize = 12.sp) }
                     Column(Modifier.weight(1f).padding(start = 16.dp)) {
                         (5 downTo 1).forEach { s ->
                             val c = ratings.count { it.stars == s }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("$s", fontSize = 12.sp, modifier = Modifier.width(14.dp))
+                                Text(s.l(), fontSize = 12.sp, modifier = Modifier.width(14.dp))
                                 LinearProgressIndicator(progress = { if (ratings.isEmpty()) 0f else c.toFloat() / ratings.size }, Modifier.weight(1f).padding(vertical = 4.dp), color = DP.Warning, trackColor = DP.Line)
                             }
                         }
@@ -209,7 +223,7 @@ fun RatingsScreen(avg: Double, ratings: List<Rating>, onBack: () -> Unit) {
             }
             ratings.forEach { r ->
                 DCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) { Avatar(r.customer, 36.dp); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) { Text(r.customer, style = MaterialTheme.typography.titleSmall); Text("${r.date} · ${r.tripCode}", color = DP.Muted, fontSize = 11.sp) }; Stars(r.stars, 14.dp) }
+                    Row(verticalAlignment = Alignment.CenterVertically) { Avatar(r.customer, 36.dp); Column(Modifier.weight(1f).padding(horizontal = 10.dp)) { Text(r.customer, style = MaterialTheme.typography.titleSmall); Text(str(R.string.dot_join, dateText(r.date), r.tripCode), color = DP.Muted, fontSize = 11.sp) }; Stars(r.stars, 14.dp) }
                     Spacer(Modifier.height(6.dp)); Text(r.comment)
                 }
             }

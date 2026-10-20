@@ -1,5 +1,7 @@
 package com.durpalla.driver.ui.components
 
+import androidx.compose.ui.res.stringResource
+import com.durpalla.driver.i18n.toLocalDigits
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,8 +37,8 @@ import com.durpalla.driver.ui.theme.DP
 @Composable
 fun DTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
     TopAppBar(
-        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
-        navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+        title = { Text(title.toLocalDigits(), style = MaterialTheme.typography.titleLarge) },
+        navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
         actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = DP.Bg),
     )
@@ -79,7 +81,7 @@ fun StatusChip(text: String, tone: Tone) {
         Tone.DANGER -> DP.DangerSoft to DP.Danger
         Tone.NEUTRAL -> DP.Bg to DP.Muted
     }
-    Text(text, color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 10.dp, vertical = 4.dp))
+    Text(text.toLocalDigits(), color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 10.dp, vertical = 4.dp))
 }
 
 fun BidStatus.tone() = when (this) { BidStatus.PENDING -> Tone.WARNING; BidStatus.WON -> Tone.SUCCESS; BidStatus.LOST -> Tone.DANGER; BidStatus.EXPIRED -> Tone.NEUTRAL }
@@ -92,7 +94,7 @@ fun SegmentedTabs(options: List<String>, selected: Int, onSelect: (Int) -> Unit,
             Box(
                 Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if (sel) DP.Primary500 else Color.Transparent).clickable { onSelect(i) }.padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(s, color = if (sel) Color.White else DP.Muted, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1) }
+            ) { Text(s.toLocalDigits(), color = if (sel) Color.White else DP.Muted, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1) }
         }
     }
 }
@@ -101,7 +103,7 @@ fun SegmentedTabs(options: List<String>, selected: Int, onSelect: (Int) -> Unit,
 fun FilterChips(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { i, s ->
-            FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(s) }, shape = RoundedCornerShape(50),
+            FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(s.toLocalDigits()) }, shape = RoundedCornerShape(50),
                 colors = brandChipColors(), border = FilterChipDefaults.filterChipBorder(true, i == selected, borderColor = DP.Line, selectedBorderColor = DP.Primary500))
         }
     }
@@ -125,7 +127,7 @@ fun Avatar(name: String, size: Dp = 44.dp) {
 fun RatingText(rating: Double, extra: String = "") {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.Star, null, tint = DP.Warning, modifier = Modifier.size(14.dp))
-        Text(" $rating$extra", style = MaterialTheme.typography.bodySmall, color = DP.Muted)
+        Text(" ${num(rating)}${extra.toLocalDigits()}", style = MaterialTheme.typography.bodySmall, color = DP.Muted)
     }
 }
 
@@ -134,21 +136,21 @@ fun Stars(count: Int, size: Dp = 16.dp) = Row { repeat(5) { Icon(Icons.Filled.St
 
 @Composable
 fun RouteText(from: String, to: String, style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium) =
-    Text("$from → $to", style = style, color = DP.Ink)
+    Text(stringResource(R.string.route_from_to, from, to).toLocalDigits(), style = style, color = DP.Ink)
 
 @Composable
 fun StatTile(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = DP.Ink) {
     Column(modifier.clip(RoundedCornerShape(14.dp)).background(Color.White).border(1.dp, DP.Line, RoundedCornerShape(14.dp)).padding(12.dp)) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = DP.Muted)
-        Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor, fontWeight = FontWeight.Bold)
+        Text(value.toLocalDigits(), style = MaterialTheme.typography.titleMedium, color = valueColor, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 fun KeyValue(key: String, value: String, valueColor: Color = DP.Ink, bold: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(key, color = DP.Muted, style = MaterialTheme.typography.bodyMedium)
-        Text(value, color = valueColor, fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+        Text(key.toLocalDigits(), color = DP.Muted, modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp), style = MaterialTheme.typography.bodyMedium)
+        Text(value.toLocalDigits(), color = valueColor, fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -166,9 +168,9 @@ fun MenuRow(icon: ImageVector, title: String, subtitle: String? = null, trailing
         Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(DP.Primary100), contentAlignment = Alignment.Center) { Icon(icon, null, tint = DP.Primary500) }
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DP.Muted)
+            if (subtitle != null) Text(subtitle.toLocalDigits(), style = MaterialTheme.typography.bodySmall, color = DP.Muted)
         }
-        if (trailing != null) Text(trailing, color = DP.Muted, fontSize = 12.sp)
+        if (trailing != null) Text(trailing.toLocalDigits(), color = DP.Muted, fontSize = 12.sp)
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = DP.Muted)
     }
 }
@@ -178,20 +180,20 @@ fun MenuRow(icon: ImageVector, title: String, subtitle: String? = null, trailing
 fun MapPlaceholder(from: String, to: String, modifier: Modifier = Modifier, height: Dp = 180.dp) {
     Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(16.dp)).background(DP.Primary100), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("📍 $from", color = DP.Primary700, fontWeight = FontWeight.SemiBold)
+            Text("📍 $from".toLocalDigits(), color = DP.Primary700, fontWeight = FontWeight.SemiBold)
             Text("┆\n┆", color = DP.Primary500, textAlign = TextAlign.Center)
-            Text("🏁 $to", color = DP.Primary700, fontWeight = FontWeight.SemiBold)
-            Text("Map preview", style = MaterialTheme.typography.labelSmall, color = DP.Muted)
+            Text("🏁 $to".toLocalDigits(), color = DP.Primary700, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.map_preview), style = MaterialTheme.typography.labelSmall, color = DP.Muted)
         }
     }
 }
 
 @Composable
 fun DurpallaLogo(modifier: Modifier = Modifier, stacked: Boolean = false) =
-    Image(painterResource(if (stacked) R.drawable.durpalla_logo_stacked else R.drawable.durpalla_logo_horizontal), "Durpalla", modifier)
+    Image(painterResource(if (stacked) R.drawable.durpalla_logo_stacked else R.drawable.durpalla_logo_horizontal), stringResource(R.string.brand_durpalla), modifier)
 
 @Composable
-fun EmptyState(text: String) = Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { Text(text, color = DP.Muted) }
+fun EmptyState(text: String) = Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { Text(text.toLocalDigits(), color = DP.Muted) }
 
 @Composable
 fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> Unit) =

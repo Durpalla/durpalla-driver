@@ -1,5 +1,8 @@
 package com.durpalla.driver.data
 
+import com.durpalla.driver.R
+import com.durpalla.driver.i18n.UiText
+import com.durpalla.driver.i18n.UserFacingException
 import com.durpalla.driver.domain.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,7 +99,7 @@ class FakeAuthRepository : AuthRepository {
     override suspend fun registerDeviceToken(token: String) = run { lastDeviceToken = token; Result.success(Unit) }
     override suspend fun verifyOtp(phone: String, code: String): Result<Boolean> {
         delay(400)
-        return if (code.length == 6) Result.success(false) else Result.failure(IllegalArgumentException("Invalid code"))
+        return if (code.length == 6) Result.success(false) else Result.failure(UserFacingException(UiText.res(R.string.err_otp)))
     }
     override suspend fun submitKyc(type: VehicleType, docs: List<String>) = run { delay(400); Result.success(Unit) }
 }
@@ -137,9 +140,9 @@ class FakeRequestRepository(
 
     override suspend fun placeBid(requestId: String, amount: Int, note: String): Result<Bid> {
         delay(300)
-        val req = _requests.value.firstOrNull { it.id == requestId } ?: return Result.failure(NoSuchElementException("Request gone"))
+        val req = _requests.value.firstOrNull { it.id == requestId } ?: return Result.failure(UserFacingException(UiText.res(R.string.err_request_gone)))
         return when (val v = BidRules.validate(amount, req, tripRepo.trips.value, policy)) {
-            is BidValidation.Error -> Result.failure(IllegalStateException(v.message))
+            is BidValidation.Error -> Result.failure(UserFacingException(v.text))
             BidValidation.Ok -> {
                 val bid = Bid("b${System.nanoTime()}", requestId, req, amount, note, BidStatus.PENDING)
                 _bids.update { listOf(bid) + it }
@@ -199,9 +202,9 @@ class FakeEarningsRepository : EarningsRepository {
         delay(600)
         val bal = _summary.value.walletBalance
         return when {
-            pin.length != 4 -> Result.failure(IllegalArgumentException("Enter your 4-digit PIN"))
-            amount < 500 -> Result.failure(IllegalArgumentException("Minimum withdrawal is ৳500"))
-            amount > bal -> Result.failure(IllegalArgumentException("Amount exceeds wallet balance"))
+            pin.length != 4 -> Result.failure(UserFacingException(UiText.res(R.string.err_pin)))
+            amount < 500 -> Result.failure(UserFacingException(UiText.res(R.string.err_min_withdraw, UiText.Taka(500))))
+            amount > bal -> Result.failure(UserFacingException(UiText.res(R.string.err_exceeds)))
             else -> {
                 val tx = WalletTx("w${System.nanoTime()}", "Withdraw to ${account.method.label}", LocalDate.now(), -amount, TxType.WITHDRAWAL)
                 _tx.update { listOf(tx) + it }
@@ -235,4 +238,7 @@ object ServiceLocator {
         else com.durpalla.driver.realtime.FakeRealtimeClient(appScope, { requests.requests.value.filter { it.status == RequestStatus.OPEN || it.status == RequestStatus.BIDDING } })
     }
     var botProtection: com.durpalla.driver.security.BotProtection = com.durpalla.driver.security.NoopBotProtection
+    /** Replaced with the DataStore + AppCompat implementation in DriverApplication. */
+    var language: com.durpalla.driver.i18n.LanguageManager =
+        com.durpalla.driver.i18n.LanguageManager(com.durpalla.driver.i18n.InMemoryLanguageStore(), { })
 }
