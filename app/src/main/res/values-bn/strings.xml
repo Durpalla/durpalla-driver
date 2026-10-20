@@ -384,4 +384,6 @@
     <string name="n_request_body">%1$s → %2$s · %3$s · %4$s–%5$s</string>
     <string name="n_accepted_title">🎉 যাত্রী আপনার বিড গ্রহণ করেছেন!</string>
     <string name="n_accepted_body">ট্রিপ %1$s নিশ্চিত হয়েছে। সময় লক করা হয়েছে।</string>
+    <string name="not_available_title">পাওয়া যাচ্ছে না</string>
+    <string name="not_available_body">এটি আর পাওয়া যাচ্ছে না। হয়তো বাতিল হয়েছে বা আগেই সম্পন্ন হয়েছে।</string>
 </resources>
