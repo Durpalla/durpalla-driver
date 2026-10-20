@@ -35,7 +35,7 @@ class CallContractTest {
     @Test fun callDocUsesContractFieldNames() {
         val m = mapOf<String, Any?>("callId" to "c1", "tripId" to "t1", "callerId" to "d1", "callerRole" to "driver", "calleeId" to "u1", "calleeRole" to "customer",
             "offer" to mapOf("type" to "offer", "sdp" to "v=0"), "answer" to mapOf("type" to "answer", "sdp" to "v=1"), "status" to "accepted",
-            "createdAt" to 1L, "answeredAt" to 2L, "endedAt" to 3L, "endedBy" to "u1", "reason" to "hangup")
+            "createdAt" to 1L, "answeredAt" to 2L, "endedAt" to 3L, "endedBy" to "u1", "reason" to "hangup", "provider" to "agora")
         assertEquals(CallDoc.FIELDS.toSet(), m.keys)
         val d = CallDoc.from(m)
         assertEquals(CallRole.DRIVER, d.callerRole); assertEquals(CallRole.CUSTOMER, d.calleeRole); assertEquals(CallStatus.ACCEPTED, d.status)

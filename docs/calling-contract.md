@@ -1,9 +1,25 @@
 # In-app calling contract (driver ⇄ customer)
 
-Audio-only **WebRTC** calls between the driver and the customer of a trip. **Firebase Firestore** carries signaling. This contract is shared with the customer apps (Android and iOS), so field names, statuses and audio settings must match exactly.
+Audio-only calls between the driver and the customer of a trip. The **server picks the media provider per call**: **Agora** (launch default) or **WebRTC** (section 0). **Firebase Firestore** carries call status for both, and SDP/ICE signaling for WebRTC. This contract is shared with the customer apps (Android and iOS), so field names, statuses and audio settings must match exactly.
 
-- Android driver library: `io.getstream:stream-webrtc-android` (the `org.webrtc` API).
+- Android driver libraries: `io.getstream:stream-webrtc-android` (the `org.webrtc` API) and `io.agora.rtc:voice-sdk` 4.6.x.
 - Code: `app/src/main/java/com/durpalla/driver/call/`.
+
+## 0. Provider (Agora / WebRTC)
+
+- `provider` is `"agora"` or `"webrtc"`, chosen by the server when the call is created and stored on the call (`trip_calls.provider`).
+- It is carried by: the `POST /calls` response, the FCM `call.incoming` data (which has both `event` and `type`), the iOS VoIP push, every Pusher `call.*` event, the Firestore doc `calls/{callId}`, the accept/decline/end responses and every `callLog` entry.
+- **Missing or unknown `provider` means `webrtc`.** Both sides always use the provider stored on the call, never a local preference.
+- Shared for both providers: ringing (FCM/VoIP/Pusher), `status` in the Firestore doc and the REST accept/decline/end, the 30 s missed timeout and `callLog`.
+- **agora:** no `offer`/`answer`/candidates are written. Each party calls `GET /calls/{callId}/agora-token` (the caller right after `POST /calls`, the callee after accept) and joins channel `call_{callId}`:
+  - audio only, `CHANNEL_PROFILE_COMMUNICATION`, role broadcaster, `AUDIO_PROFILE_SPEECH_STANDARD`, `AUDIO_SCENARIO_CHATROOM`;
+  - Active when the remote uid joins (`onUserJoined`);
+  - renew on `onTokenPrivilegeWillExpire` by calling the same endpoint and `renewToken`;
+  - `leaveChannel` on end, decline or failure;
+  - weak-network hint from `onNetworkQuality` (local uid 0, tx/rx ≥ 4 = bad) and `onRtcStats` (loss ≥ 5 % or lastmile RTT ≥ 400 ms); it clears after 3 good samples.
+  - The App ID comes only from the token response; it is never hardcoded in the apps.
+- Server selection (apigw): `CALL_PROVIDER_OVERRIDES` (per user, caller first) → `CALL_PROVIDER_WEBRTC_PERCENT` (stable per trip) → `CALL_PROVIDER_DEFAULT=agora`. While Agora isn't configured the server picks webrtc.
+- Driver app: `CallProviderRouter` picks `AgoraCallProvider` or `WebRtcCallProvider` per call; `FakeCallProvider` is used when Firebase isn't configured.
 
 ## 1. REST endpoints
 
@@ -13,7 +29,8 @@ Audio-only **WebRTC** calls between the driver and the customer of a trip. **Fir
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/calls` | `{ "tripId": "t_123" }` | `201 { "callId": "c_456" }` |
+| POST | `/calls` | `{ "tripId": "123" }` | `201 { "callId": "456", "provider": "agora" }` |
+| GET | `/calls/{callId}/agora-token` | – | `200 { "appId": "…", "channel": "call_456", "token": "007…", "uid": 2000000007, "expiresAt": 1790000000 }` (agora calls only; parties only; `expiresAt` epoch seconds) |
 | POST | `/calls/{callId}/accept` | `{}` | `200 {}` |
 | POST | `/calls/{callId}/decline` | `{}` | `200 {}` |
 | POST | `/calls/{callId}/end` | `{ "reason": "hangup" \| "cancelled" \| "missed" \| "failed" }` | `200 {}` |
@@ -23,7 +40,8 @@ Audio-only **WebRTC** calls between the driver and the customer of a trip. **Fir
 
 ### What the endpoints do
 
-- **There is no `rtcToken` and no `channel`.** The `callId` is the only handle.
+- The `callId` is the call's handle. For agora calls the channel is always `call_{callId}`.
+- **agora-token:** an Agora RTC AccessToken2 built server-side with the App Certificate, role publisher, TTL `AGORA_TOKEN_TTL` (default 3600 s). `uid` is a stable int per user: customer = customer id, driver = 2000000000 + driver id.
 - **POST /calls** checks that the caller is a party to the trip and that the trip is calling-eligible (`UPCOMING`, `ON_THE_WAY`, `ARRIVED` or `IN_PROGRESS`). It then:
   - creates the Firestore doc `calls/{callId}` with `status: "ringing"`;
   - rings the callee;
@@ -50,13 +68,15 @@ Error responses have the shape `{ "error": { "code": "CALL_BUSY", "message": "�
 | 409 | `CALL_BUSY` | Callee already has a ringing or accepted call |
 | 404 | `CALL_NOT_FOUND` | Unknown callId |
 | 409 | `CALL_ALREADY_ENDED` | accept, decline or end on a terminal call |
+| 409 | `CALL_PROVIDER_MISMATCH` | agora-token on a webrtc call |
+| 503 | `CALL_PROVIDER_UNAVAILABLE` | Agora isn't configured on the server |
 | 429 | `RATE_LIMITED` | Too many call attempts |
 
 ## 2. Ringing the callee
 
 - **Primary path (Android and iOS):** a high-priority FCM **data** message, `priority: high`, with no `notification` block:
   ```json
-  { "event": "call.incoming", "callId": "c_456", "tripId": "t_123", "callerName": "Rahim" }
+  { "event": "call.incoming", "type": "call.incoming", "callId": "456", "tripId": "123", "callerName": "Rahim", "provider": "agora" }
   ```
   - The fields may also be sent as a JSON string in `payload`.
   - Android shows a full-screen `CallStyle.forIncomingCall` notification that rings for up to 30 s.
@@ -82,6 +102,7 @@ calls/{callId} {
   endedAt:     timestamp | null
   endedBy:     string | null    // userId
   reason:      string | null    // hangup | cancelled | declined | no_answer | missed | failed | busy
+  provider:    "agora" | "webrtc"   // set by the server; missing = webrtc. agora: offer/answer/candidates stay empty
 }
 calls/{callId}/callerCandidates/{auto} { candidate: string, sdpMid: string, sdpMLineIndex: number }
 calls/{callId}/calleeCandidates/{auto} { candidate: string, sdpMid: string, sdpMLineIndex: number }
@@ -149,7 +170,7 @@ The trip payload carries `callLog`, oldest first:
 "callLog": [
   { "callId": "c_456", "callerRole": "driver", "status": "ended",
     "createdAt": 1760960000000, "answeredAt": 1760960004000, "endedAt": 1760960070000,
-    "durationSec": 66, "endedBy": "u_customer", "reason": "hangup" }
+    "durationSec": 66, "endedBy": "customer_7", "reason": "hangup", "provider": "agora" }
 ]
 ```
 

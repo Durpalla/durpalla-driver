@@ -245,11 +245,15 @@ object ServiceLocator {
     @Volatile var firebaseToken: suspend () -> String? = { null }
     var firebaseConfigured = false
     val callApi: com.durpalla.driver.call.CallApi by lazy { com.durpalla.driver.call.HttpCallApi(com.durpalla.driver.BuildConfig.API_BASE_URL, { authToken() }) }
-    /** WebRTC + Firestore when Firebase is configured, otherwise the offline simulator. */
+    /** Server picks agora|webrtc per call (router) when Firebase is configured, otherwise the offline simulator. */
     val calls: com.durpalla.driver.call.CallProvider by lazy {
-        if (firebaseConfigured) com.durpalla.driver.call.WebRtcCallProvider(appContext, appScope, callApi,
-            com.durpalla.driver.call.FirestoreSignaling(customToken = { firebaseToken() }))
-        else com.durpalla.driver.call.FakeCallProvider(appScope)
+        if (firebaseConfigured) {
+            val signaling = com.durpalla.driver.call.FirestoreSignaling(customToken = { firebaseToken() })
+            com.durpalla.driver.call.CallProviderRouter(appScope, callApi, mapOf(
+                com.durpalla.driver.call.CallProviderKind.AGORA to com.durpalla.driver.call.AgoraCallProvider(appContext, appScope, callApi, signaling),
+                com.durpalla.driver.call.CallProviderKind.WEBRTC to com.durpalla.driver.call.WebRtcCallProvider(appContext, appScope, callApi, signaling),
+            ))
+        } else com.durpalla.driver.call.FakeCallProvider(appScope)
     }
     /** Set when the user tapped Accept on the incoming-call notification. */
     val acceptFromNotification = kotlinx.coroutines.flow.MutableStateFlow(false)

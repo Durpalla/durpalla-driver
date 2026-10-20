@@ -70,14 +70,17 @@ class WebRtcCallProvider(
     private fun set(s: CallState) { _state.value = s; onStateChanged(s) }
     private val busy get() = _state.value !is CallState.Idle && _state.value !is CallState.Ended
 
-    override fun startCall(tripId: String, peerName: String) {
+    override fun startCall(tripId: String, peerName: String) = begin(tripId, peerName, null)
+    override fun continueOutgoing(tripId: String, peerName: String, callId: String) = begin(tripId, peerName, callId)
+
+    private fun begin(tripId: String, peerName: String, started: String?) {
         if (busy) return
         asCaller = true
         set(CallState.Outgoing(tripId, peerName, null, System.currentTimeMillis()))
         scope.launch {
             runCatching {
                 signaling.ensureSignedIn()
-                val id = api.start(tripId).getOrThrow(); callId = id
+                val id = started ?: api.start(tripId).getOrThrow().callId; callId = id
                 (_state.value as? CallState.Outgoing)?.let { set(it.copy(callId = id)) } ?: return@launch
                 val peer = createPeer(id)
                 val offer = peer.createOffer().munged()

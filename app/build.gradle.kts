@@ -17,6 +17,13 @@ fun cfg(key: String, default: String = ""): String =
     (localProps.getProperty(key) ?: (project.findProperty(key) as String?) ?: System.getenv(key) ?: default).replace("\"", "")
 
 android {
+    // Agora voice: drop optional extensions we never load (lip sync, spatial audio, voice beautifier).
+    // AI noise suppression / echo cancellation stay for boat and road noise.
+    packaging {
+        jniLibs {
+            excludes += listOf("lib/*/libagora_lip_sync_extension.so", "lib/*/libagora_spatial_audio_extension.so", "lib/*/libagora_audio_beauty_extension.so")
+        }
+    }
     namespace = "com.durpalla.driver"
     compileSdk = 35
 
@@ -85,6 +92,8 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.stream.webrtc.android)
+    // Agora voice: server picks agora|webrtc per call (CallProviderRouter)
+    implementation(libs.agora.voice.sdk)
     implementation(libs.pusher.java.client)
     implementation(libs.recaptcha)
     implementation(libs.gson)

@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** Calling backend. [FakeCallProvider] when Firebase isn't configured, [WebRtcCallProvider] otherwise. */
+/** Calling backend. [FakeCallProvider] when Firebase isn't configured; otherwise [CallProviderRouter] over [AgoraCallProvider] + [WebRtcCallProvider]. */
 interface CallProvider {
     val state: StateFlow<CallState>
     fun startCall(tripId: String, peerName: String)
+    /** POST /calls already ran (by [CallProviderRouter]); continue the outgoing call on this provider. */
+    fun continueOutgoing(tripId: String, peerName: String, callId: String)
     /** FCM `call.incoming` (or the Pusher secondary path). Ignored when already in a call (server gets busy via decline). */
     fun onIncoming(call: IncomingCall)
     fun accept()
@@ -37,9 +39,10 @@ class FakeCallProvider(
 
     private fun ringTimeout() { job?.cancel(); job = scope.launch { delay(CallMachine.RING_TIMEOUT_MS); if (CallMachine.ringTimedOut(_state.value, now())) _state.value = CallMachine.ended(_state.value, EndReason.MISSED, now()) } }
 
-    override fun startCall(tripId: String, peerName: String) {
+    override fun startCall(tripId: String, peerName: String) = continueOutgoing(tripId, peerName, "fake-call-${n + 1}")
+    override fun continueOutgoing(tripId: String, peerName: String, callId: String) {
         if (_state.value !is CallState.Idle && _state.value !is CallState.Ended) return
-        val id = "fake-call-${++n}"
+        n++; val id = callId
         _state.value = CallState.Outgoing(tripId, peerName, id, now())
         job?.cancel()
         job = scope.launch {

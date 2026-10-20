@@ -10,11 +10,12 @@ import java.net.URL
 
 /** REST side of calling (docs/calling-contract.md). All calls use `Authorization: Bearer <token>`. */
 interface CallApi {
-    suspend fun start(tripId: String): Result<String>                    // POST /calls {tripId} -> {callId}
+    suspend fun start(tripId: String): Result<StartedCall>               // POST /calls {tripId} -> {callId, provider}
     suspend fun accept(callId: String): Result<Unit>                     // POST /calls/{callId}/accept
     suspend fun decline(callId: String): Result<Unit>                    // POST /calls/{callId}/decline
     suspend fun end(callId: String, reason: String): Result<Unit>        // POST /calls/{callId}/end {reason}
     suspend fun iceServers(): Result<IceConfig>                          // GET /calls/ice-servers
+    suspend fun agoraToken(callId: String): Result<AgoraToken>           // GET /calls/{callId}/agora-token
 }
 
 object CallJson {
@@ -22,7 +23,16 @@ object CallJson {
     data class EndCall(val reason: String)
     fun start(tripId: String): String = ApiJson.gson.toJson(StartCall(tripId))
     fun end(reason: String): String = ApiJson.gson.toJson(EndCall(reason))
-    fun callId(body: String): String = JsonParser.parseString(body).asJsonObject["callId"].asString
+    fun callId(body: String): String = started(body).callId
+
+    /** Accepts the bare object or the `{data: {...}}` envelope. Missing provider → webrtc. */
+    private fun obj(body: String) = JsonParser.parseString(body).asJsonObject.let { o -> o["data"]?.takeIf { it.isJsonObject }?.asJsonObject ?: o }
+    fun started(body: String): StartedCall = obj(body).let { o ->
+        StartedCall(o["callId"].asString, CallProviderKind.of(o["provider"]?.takeIf { !it.isJsonNull }?.asString))
+    }
+    fun agoraToken(body: String): AgoraToken = obj(body).let { o ->
+        AgoraToken(o["appId"].asString, o["channel"].asString, o["token"].asString, o["uid"].asLong.toInt(), o["expiresAt"]?.takeIf { !it.isJsonNull }?.asLong ?: 0)
+    }
 
     /** Accepts `[{urls,username,credential}]` or `{iceServers:[...], ttl}`; `urls` may be a string or an array. */
     fun iceServers(body: String): IceConfig {
@@ -58,7 +68,8 @@ class HttpCallApi(private val baseUrl: String, private val token: () -> String?)
         } catch (e: IOException) { Result.failure(CallException(CallError.NETWORK, e.message)) }
     }
 
-    override suspend fun start(tripId: String) = call("POST", "/calls", CallJson.start(tripId)).mapCatching { CallJson.callId(it) }
+    override suspend fun start(tripId: String) = call("POST", "/calls", CallJson.start(tripId)).mapCatching { CallJson.started(it) }
+    override suspend fun agoraToken(callId: String) = call("GET", "/calls/$callId/agora-token").mapCatching { CallJson.agoraToken(it) }
     override suspend fun accept(callId: String) = call("POST", "/calls/$callId/accept", "{}").map { }
     override suspend fun decline(callId: String) = call("POST", "/calls/$callId/decline", "{}").map { }
     override suspend fun end(callId: String, reason: String) = call("POST", "/calls/$callId/end", CallJson.end(reason)).map { }
