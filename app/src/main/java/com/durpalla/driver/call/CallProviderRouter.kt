@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Picks the media provider per call from the server's `provider` field (missing → webrtc), then delegates.
- * Outgoing: POST /calls first (returns {callId, provider}), then [CallProvider.continueOutgoing] on that provider.
+ * Outgoing: POST /calls first (returns {callId, provider, agora|iceServers}), then [CallProvider.continueOutgoing] on that provider.
  * Incoming: `provider` from the FCM/Pusher `call.incoming` payload. [state] mirrors the active provider.
  */
 class CallProviderRouter(
@@ -41,13 +41,13 @@ class CallProviderRouter(
             if (_state.value !is CallState.Outgoing) { // hung up while POST /calls was in flight
                 r.getOrNull()?.let { api.end(it.callId, "cancelled") }; return@launch
             }
-            r.onSuccess { s -> use(s.provider).continueOutgoing(tripId, peerName, s.callId) }
+            r.onSuccess { s -> use(s.provider).continueOutgoing(tripId, peerName, s) }
                 .onFailure { t -> val err = (t as? CallException)?.error ?: CallError.NETWORK
                     _state.value = CallMachine.ended(_state.value, if (err == CallError.BUSY) EndReason.BUSY else EndReason.FAILED, now(), err) }
         }
     }
 
-    override fun continueOutgoing(tripId: String, peerName: String, callId: String) = use(CallProviderKind.WEBRTC).continueOutgoing(tripId, peerName, callId)
+    override fun continueOutgoing(tripId: String, peerName: String, started: StartedCall) = use(started.provider).continueOutgoing(tripId, peerName, started)
 
     override fun onIncoming(call: IncomingCall) {
         if (busy) { scope.launch { api.decline(call.callId) }; return }

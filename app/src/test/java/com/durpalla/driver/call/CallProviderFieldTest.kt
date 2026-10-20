@@ -18,9 +18,21 @@ class CallProviderFieldTest {
         assertEquals(StartedCall("9", CallProviderKind.WEBRTC), CallJson.started("""{"callId":"9"}"""))
     }
 
-    @Test fun agoraTokenResponse() {
-        val t = CallJson.agoraToken("""{"data":{"appId":"a1","channel":"call_9","token":"007abc","uid":2000000007,"expiresAt":1790000000}}""")
-        assertEquals(AgoraToken("a1", "call_9", "007abc", 2000000007, 1790000000), t)
+    @Test fun agoraInStartResponse() {
+        val s = CallJson.started("""{"data":{"callId":"9","provider":"agora","agora":{"appId":"a1","channel":"call_9","token":"007abc","uid":2000000007,"expiresAt":1790000000},"iceServers":null}}""")
+        assertEquals(AgoraToken("a1", "call_9", "007abc", 2000000007, 1790000000), s.agora)
+        assertNull(s.ice)
+    }
+
+    @Test fun iceServersInStartResponse() {
+        val s = CallJson.started("""{"data":{"callId":"9","provider":"webrtc","agora":null,"iceServers":[{"urls":["stun:t:3478"]},{"urls":"turn:t:3478","username":"u","credential":"p"}],"ttl":3600}}""")
+        assertEquals(CallProviderKind.WEBRTC, s.provider); assertNull(s.agora)
+        assertEquals(3600L, s.ice!!.ttlSeconds); assertEquals(IceServerDto(listOf("turn:t:3478"), "u", "p"), s.ice!!.servers[1])
+        assertNull(CallJson.started("""{"callId":"9","provider":"webrtc","iceServers":null}""").ice)
+    }
+
+    @Test fun renewResponse() {
+        assertEquals(RenewedToken("007n", 1790003600), CallJson.renewed("""{"data":{"token":"007n","expiresAt":1790003600}}"""))
     }
 
     @Test fun fcmAndDocCarryProvider() {

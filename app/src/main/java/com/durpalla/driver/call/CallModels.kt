@@ -20,10 +20,16 @@ enum class CallProviderKind(val wire: String) {
     companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s?.trim()?.lowercase() } ?: WEBRTC }
 }
 
-/** POST /calls → {callId, provider}. */
-data class StartedCall(val callId: String, val provider: CallProviderKind)
+/**
+ * POST /calls (caller) and POST /calls/{id}/accept (callee) →
+ * {callId, provider, agora:{…}|null, iceServers:[…]|null, ttl?}. [agora] only for agora; [ice] only for webrtc.
+ */
+data class StartedCall(val callId: String, val provider: CallProviderKind, val agora: AgoraToken? = null, val ice: IceConfig? = null)
 
-/** GET /calls/{callId}/agora-token → {appId, channel, token, uid, expiresAt (epoch s)}. */
+/** POST /calls/{callId}/token → {token, expiresAt}. */
+data class RenewedToken(val token: String, val expiresAt: Long)
+
+/** `agora` in the start/accept response: {appId, channel, token, uid, expiresAt (epoch s)}. */
 data class AgoraToken(val appId: String, val channel: String, val token: String, val uid: Int, val expiresAt: Long)
 
 enum class CallRole(val wire: String) { DRIVER("driver"), CUSTOMER("customer"); companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s } } }
