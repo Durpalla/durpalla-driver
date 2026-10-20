@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,7 +84,7 @@ fun DriverApp(vm: DriverViewModel = viewModel()) {
             }
         },
     ) { outer ->
-        NavHost(nav, startDestination = Routes.SPLASH, modifier = Modifier.padding(bottom = outer.calculateBottomPadding())) {
+        NavHost(nav, startDestination = Routes.SPLASH, modifier = Modifier.padding(bottom = if (current in tabs.map { it.route }) outer.calculateBottomPadding() else 0.dp)) {
             composable(Routes.SPLASH) { SplashScreen { nav.navigate(Routes.LOGIN) { popUpTo(Routes.SPLASH) { inclusive = true } } } }
             composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.navigate(Routes.OTP) } } }
             composable(Routes.OTP) { OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code -> vm.verifyOtp(code) { kyc -> nav.navigate(if (kyc) Routes.HOME else Routes.KYC_VEHICLE) } } }

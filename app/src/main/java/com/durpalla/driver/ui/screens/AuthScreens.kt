@@ -50,45 +50,6 @@ fun SplashScreen(onContinue: () -> Unit) {
     }
 }
 
-@Composable
-fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> Unit) {
-    Scaffold(bottomBar = { StickyCta { PrimaryButton(if (state.loading) "Sending…" else "Send OTP", onSend, enabled = !state.loading) } }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Spacer(Modifier.height(24.dp))
-            DurpallaLogo(Modifier.height(40.dp))
-            Text("Welcome, driver", style = MaterialTheme.typography.headlineMedium)
-            Text("Log in with your mobile number to start receiving trip requests.", color = DP.Muted)
-            OutlinedTextField(
-                value = state.phone, onValueChange = onPhone, modifier = Modifier.fillMaxWidth(),
-                prefix = { Text("🇧🇩 +88  ") }, placeholder = { Text("01XXXXXXXXX") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), isError = state.error != null,
-                supportingText = { state.error?.let { Text(it) } }, shape = RoundedCornerShape(14.dp),
-            )
-            Text("By continuing you agree to Durpalla's Driver Terms & Privacy Policy.", style = MaterialTheme.typography.bodySmall, color = DP.Muted)
-        }
-    }
-}
-
-@Composable
-fun OtpScreen(phone: String, error: String?, onBack: () -> Unit, onVerify: (String) -> Unit) {
-    var code by remember { mutableStateOf("") }
-    var seconds by remember { mutableIntStateOf(30) }
-    LaunchedEffect(seconds) { if (seconds > 0) { delay(1000); seconds-- } }
-    Scaffold(topBar = { DTopBar("", onBack) }, bottomBar = { StickyCta { PrimaryButton("Verify", { onVerify(code) }, enabled = code.length == 6) } }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Enter verification code", style = MaterialTheme.typography.headlineSmall)
-            Text("We sent a 6-digit code to +88 $phone", color = DP.Muted)
-            OutlinedTextField(
-                value = code, onValueChange = { code = it.filter(Char::isDigit).take(6) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                textStyle = LocalTextStyle.current.copy(fontSize = 28.sp, letterSpacing = 12.sp, textAlign = TextAlign.Center),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), shape = RoundedCornerShape(14.dp),
-                isError = error != null, supportingText = { error?.let { Text(it) } },
-            )
-            Text(if (seconds > 0) "Resend code in 0:${seconds.toString().padStart(2, '0')}" else "Resend code", color = if (seconds > 0) DP.Muted else DP.Primary500,
-                modifier = Modifier.clickable(enabled = seconds == 0) { seconds = 30 })
-        }
-    }
-}
 
 @Composable
 fun KycStepper(step: Int) {
