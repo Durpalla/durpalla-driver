@@ -13,6 +13,19 @@ enum class CallStatus(val wire: String) {
     companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s } }
 }
 
+/** Media provider the server stored on the call. Missing/unknown means [WEBRTC] (contract §Provider). */
+enum class CallProviderKind(val wire: String) {
+    @com.google.gson.annotations.SerializedName("agora") AGORA("agora"),
+    @com.google.gson.annotations.SerializedName("webrtc") WEBRTC("webrtc");
+    companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s?.trim()?.lowercase() } ?: WEBRTC }
+}
+
+/** POST /calls → {callId, provider}. */
+data class StartedCall(val callId: String, val provider: CallProviderKind)
+
+/** GET /calls/{callId}/agora-token → {appId, channel, token, uid, expiresAt (epoch s)}. */
+data class AgoraToken(val appId: String, val channel: String, val token: String, val uid: Int, val expiresAt: Long)
+
 enum class CallRole(val wire: String) { DRIVER("driver"), CUSTOMER("customer"); companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s } } }
 
 /** {type, sdp}; type is "offer" or "answer". */
@@ -48,12 +61,13 @@ data class CallDoc(
     val endedAt: Long? = null,
     val endedBy: String? = null,
     val reason: String? = null,
+    val provider: CallProviderKind = CallProviderKind.WEBRTC,
 ) {
     companion object {
         const val COLLECTION = "calls"
         const val CALLER_CANDIDATES = "callerCandidates"
         const val CALLEE_CANDIDATES = "calleeCandidates"
-        val FIELDS = listOf("callId", "tripId", "callerId", "callerRole", "calleeId", "calleeRole", "offer", "answer", "status", "createdAt", "answeredAt", "endedAt", "endedBy", "reason")
+        val FIELDS = listOf("callId", "tripId", "callerId", "callerRole", "calleeId", "calleeRole", "offer", "answer", "status", "createdAt", "answeredAt", "endedAt", "endedBy", "reason", "provider")
 
         /** [ts] converts a Firestore Timestamp/Date/Number to millis (kept injectable so this parses in plain JVM tests). */
         fun from(m: Map<String, Any?>, ts: (Any?) -> Long? = { (it as? Number)?.toLong() }) = CallDoc(
@@ -64,6 +78,7 @@ data class CallDoc(
             status = CallStatus.of(m["status"] as? String) ?: CallStatus.RINGING,
             createdAt = ts(m["createdAt"]), answeredAt = ts(m["answeredAt"]), endedAt = ts(m["endedAt"]),
             endedBy = m["endedBy"] as? String, reason = m["reason"] as? String,
+            provider = CallProviderKind.of(m["provider"] as? String),
         )
     }
 }
@@ -78,14 +93,14 @@ data class IceConfig(val servers: List<IceServerDto>, val ttlSeconds: Long) {
 }
 
 /** FCM data message `call.incoming`. */
-data class IncomingCall(val callId: String, val tripId: String, val callerName: String) {
+data class IncomingCall(val callId: String, val tripId: String, val callerName: String, val provider: CallProviderKind = CallProviderKind.WEBRTC) {
     companion object {
         const val EVENT = "call.incoming"
         fun fromFcm(data: Map<String, String>): IncomingCall? {
             if (data["event"] != EVENT && data["type"] != EVENT) return null
             val payload = data["payload"]?.let { runCatching { com.google.gson.JsonParser.parseString(it).asJsonObject }.getOrNull() }
             fun f(k: String) = data[k] ?: payload?.get(k)?.takeIf { !it.isJsonNull }?.asString
-            return IncomingCall(f("callId") ?: return null, f("tripId") ?: return null, f("callerName").orEmpty())
+            return IncomingCall(f("callId") ?: return null, f("tripId") ?: return null, f("callerName").orEmpty(), CallProviderKind.of(f("provider")))
         }
     }
 }
@@ -99,6 +114,8 @@ enum class CallError(val code: String, @StringRes val res: Int) {
     BUSY("CALL_BUSY", R.string.call_err_busy),
     NOT_FOUND("CALL_NOT_FOUND", R.string.call_err_gone),
     ALREADY_ENDED("CALL_ALREADY_ENDED", R.string.call_err_gone),
+    PROVIDER_MISMATCH("CALL_PROVIDER_MISMATCH", R.string.call_err_generic),
+    PROVIDER_UNAVAILABLE("CALL_PROVIDER_UNAVAILABLE", R.string.call_err_generic),
     RATE_LIMITED("RATE_LIMITED", R.string.call_err_rate),
     NETWORK("NETWORK", R.string.call_err_network),
     UNKNOWN("UNKNOWN", R.string.call_err_generic);
@@ -112,4 +129,5 @@ data class CallLogEntry(
     val callId: String, val callerRole: CallRole?, val status: CallStatus,
     val createdAt: Long, val answeredAt: Long? = null, val endedAt: Long? = null,
     val durationSec: Int = 0, val endedBy: String? = null, val reason: String? = null,
+    val provider: CallProviderKind = CallProviderKind.WEBRTC,
 )
