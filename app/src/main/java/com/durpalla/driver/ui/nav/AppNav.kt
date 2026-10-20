@@ -22,6 +22,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -37,7 +38,7 @@ import com.durpalla.driver.ui.theme.DP
 object Routes {
     const val SPLASH = "splash"; const val LANGUAGE_PROMPT = "language/first"; const val LANGUAGE = "language"; const val LOGIN = "login"; const val OTP = "otp"
     const val KYC_VEHICLE = "kyc/vehicle"; const val KYC_DOCS = "kyc/docs"; const val KYC_REVIEW = "kyc/review"
-    const val HOME = "home"; const val REQUESTS = "requests"; const val MY_TRIPS = "trips"; const val EARNINGS = "earnings"; const val PROFILE = "profile"
+    const val HOME = "home"; const val REQUESTS = "requests?tab={tab}"; const val MY_TRIPS = "trips"; const val EARNINGS = "earnings"; const val PROFILE = "profile"
     const val INCOMING = "request/{id}"; const val BID = "request/{id}/bid"; const val CONFLICT = "request/{id}/conflict"
     const val BID_WON = "won/{tripId}"; const val TRIP = "trip/{tripId}"; const val LIVE = "trip/{tripId}/live"
     const val COLLECT = "trip/{tripId}/collect"; const val COMPLETED = "trip/{tripId}/done"
@@ -47,6 +48,8 @@ object Routes {
     fun incoming(id: String) = "request/$id"; fun bid(id: String) = "request/$id/bid"; fun conflict(id: String) = "request/$id/conflict"
     fun won(t: String) = "won/$t"; fun trip(t: String) = "trip/$t"; fun live(t: String) = "trip/$t/live"; fun collect(t: String) = "trip/$t/collect"; fun done(t: String) = "trip/$t/done"
     fun predefForm(id: String?) = "predefined/edit?id=${id ?: ""}"
+    /** tab 0 = New requests, 1 = My bids. */
+    fun requests(tab: Int = 0) = "requests?tab=$tab"
 }
 
 private data class Tab(val route: String, @androidx.annotation.StringRes val label: Int, val icon: ImageVector)
@@ -55,9 +58,6 @@ private val tabs = listOf(
     Tab(Routes.EARNINGS, R.string.tab_earnings, Icons.Filled.Payments), Tab(Routes.PROFILE, R.string.tab_profile, Icons.Filled.Person),
 )
 
-private fun NavHostController.tab(route: String) = navigate(route) {
-    popUpTo(Routes.HOME) { saveState = true }; launchSingleTop = true; restoreState = true
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,9 +67,10 @@ fun DriverApp(
     onDeepLinkHandled: () -> Unit = {},
     language: LanguageManager = ServiceLocator.language,
     onLanguageApplied: () -> Unit = {},
+    navController: NavHostController = rememberNavController(),
 ) {
     val scope = rememberCoroutineScope()
-    val nav = rememberNavController()
+    val nav = navController
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
     val requests by vm.openRequests.collectAsStateWithLifecycle()
@@ -95,8 +96,9 @@ fun DriverApp(
     // Notification tap -> route (only once logged in, i.e. a tab destination exists in the back stack).
     LaunchedEffect(pending, current) {
         val route = pending ?: return@LaunchedEffect
-        if (current != null && current !in setOf(Routes.SPLASH, Routes.LANGUAGE_PROMPT, Routes.LOGIN, Routes.OTP)) {
-            if (route.startsWith("requests")) nav.tab(Routes.REQUESTS) else nav.navigate(route)
+        // Only once logged in (Home exists); during login/KYC the link waits.
+        if (current != null && nav.hasHome()) {
+            nav.openDeepLink(route)
             onDeepLinkHandled()
         }
     }
@@ -116,7 +118,7 @@ fun DriverApp(
         bottomBar = {
             if (current in tabs.map { it.route }) NavigationBar(containerColor = Color.White) {
                 tabs.forEach { t ->
-                    NavigationBarItem(selected = current == t.route, onClick = { nav.tab(t.route) }, icon = { Icon(t.icon, null) }, label = { Text(stringResource(t.label), maxLines = 1) },
+                    NavigationBarItem(selected = current == t.route, onClick = { if (t.route == Routes.REQUESTS) nav.navigateToTab(Routes.requests(0)) else nav.navigateToTab(t.route) }, icon = { Icon(t.icon, null) }, label = { Text(stringResource(t.label), maxLines = 1) },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = DP.Primary500, selectedTextColor = DP.Primary500, indicatorColor = DP.Primary100))
                 }
             }
@@ -128,101 +130,109 @@ fun DriverApp(
                 SplashScreen {
                     scope.launch {
                         val next = if (language.needsPrompt()) Routes.LANGUAGE_PROMPT else Routes.LOGIN
-                        nav.navigate(next) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                        nav.go(next) { popUpTo(Routes.SPLASH) { inclusive = true } }
                     }
                 }
             }
             composable(Routes.LANGUAGE_PROMPT) {
                 LanguagePromptScreen(initial = AppLanguage.fromTag(java.util.Locale.getDefault().language)?.takeIf { it == AppLanguage.BANGLA }) { lang ->
                     // Navigate first: applying the locale may recreate the activity, which restores this back stack.
-                    nav.navigate(Routes.LOGIN) { popUpTo(Routes.LANGUAGE_PROMPT) { inclusive = true } }
+                    nav.go(Routes.LOGIN) { popUpTo(Routes.LANGUAGE_PROMPT) { inclusive = true } }
                     scope.launch { language.choose(lang); onLanguageApplied() }
                 }
             }
             composable(Routes.LANGUAGE) {
                 LanguageSettingsScreen(AppLocale.language, { lang -> scope.launch { language.choose(lang); onLanguageApplied() } }) { nav.popBackStack() }
             }
-            composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.navigate(Routes.OTP) } } }
-            composable(Routes.OTP) { OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code -> vm.verifyOtp(code) { kyc -> nav.navigate(if (kyc) Routes.HOME else Routes.KYC_VEHICLE) } } }
-            composable(Routes.KYC_VEHICLE) { KycVehicleScreen(auth.kycType, vm::setKycType, { nav.popBackStack() }) { nav.navigate(Routes.KYC_DOCS) } }
-            composable(Routes.KYC_DOCS) { KycDocumentsScreen(auth.uploaded, vm::toggleDoc, { nav.popBackStack() }) { vm.submitKyc { nav.navigate(Routes.KYC_REVIEW) } } }
-            composable(Routes.KYC_REVIEW) { KycReviewScreen { nav.navigate(Routes.HOME) { popUpTo(0) { inclusive = true } } } }
+            composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.go(Routes.OTP) } } }
+            composable(Routes.OTP) { OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code -> vm.verifyOtp(code) { kyc -> if (kyc) nav.navigateToHome() else nav.go(Routes.KYC_VEHICLE) } } }
+            composable(Routes.KYC_VEHICLE) { KycVehicleScreen(auth.kycType, vm::setKycType, { nav.popBackStack() }) { nav.go(Routes.KYC_DOCS) } }
+            composable(Routes.KYC_DOCS) { KycDocumentsScreen(auth.uploaded, vm::toggleDoc, { nav.popBackStack() }) { vm.submitKyc { nav.go(Routes.KYC_REVIEW) } } }
+            composable(Routes.KYC_REVIEW) { KycReviewScreen { nav.navigateToHome() } }
+
+          // Logged-in area. Home is the start destination: every "Back to home" pops to it.
+          navigation(startDestination = Routes.HOME, route = MAIN_GRAPH) {
 
             composable(Routes.HOME) {
                 HomeScreen(driver, online, vm::setOnline, summary, bids.count { it.status == BidStatus.PENDING },
                     trips.filter { it.status == TripStatus.UPCOMING }.minByOrNull { it.slot.start }, requests, blockedFn,
-                    onNotifications = { nav.navigate(Routes.NOTIFS) }, onUpcoming = { nav.navigate(Routes.trip(it.id)) },
-                    onRequest = { nav.navigate(Routes.incoming(it.id)) }, onSkip = { vm.skip(it.id) }, onSeeAll = { nav.tab(Routes.REQUESTS) }, connection = connection)
+                    onNotifications = { nav.go(Routes.NOTIFS) }, onUpcoming = { nav.go(Routes.trip(it.id)) },
+                    onRequest = { nav.go(Routes.incoming(it.id)) }, onSkip = { vm.skip(it.id) }, onSeeAll = { nav.navigateToTab(Routes.requests(0)) }, connection = connection)
             }
-            composable(Routes.REQUESTS) {
-                RequestsScreen(requests, bids, blockedFn, 0, { nav.navigate(Routes.NOTIFS) }, { nav.navigate(Routes.incoming(it.id)) }, { bidSheet = it }, connection)
+            composable(Routes.REQUESTS, arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 })) { e ->
+                RequestsScreen(requests, bids, blockedFn, e.arguments?.getInt("tab") ?: 0, { nav.go(Routes.NOTIFS) }, { nav.go(Routes.incoming(it.id)) }, { bidSheet = it }, connection)
             }
             composable(Routes.INCOMING) { e ->
-                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
+                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
                 IncomingRequestScreen(r, vm.conflictFor(r), { nav.popBackStack() }, { vm.skip(r.id); nav.popBackStack() },
-                    { vm.resetBid(r.suggestedMin); nav.navigate(Routes.bid(r.id)) }, { nav.navigate(Routes.conflict(r.id)) }, live[r.id], connection)
+                    { vm.resetBid(r.suggestedMin); nav.go(Routes.bid(r.id)) }, { nav.go(Routes.conflict(r.id)) }, live[r.id], connection)
             }
             composable(Routes.BID) { e ->
-                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
+                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
                 PlaceBidScreen(r, bidForm, vm::setBidAmount, vm::setBidNote, { nav.popBackStack() }, { vm.submitBid(r.id) },
-                    onDone = { vm.resetBid(); nav.tab(Routes.REQUESTS) }, live = live[r.id], connection = connection)
+                    onDone = { vm.resetBid(); nav.navigateToTabFresh(Routes.requests(1), Routes.REQUESTS) }, live = live[r.id], connection = connection)
             }
             composable(Routes.CONFLICT) { e ->
-                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable
-                SlotConflictScreen(r, vm.conflictFor(r), { nav.popBackStack() }) { nav.navigate(Routes.trip(it.id)) }
+                val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
+                SlotConflictScreen(r, vm.conflictFor(r), { nav.popBackStack() }) { nav.go(Routes.trip(it.id)) }
             }
             composable(Routes.BID_WON) { e ->
-                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable
-                BidWonScreen(t, { nav.navigate(Routes.trip(t.id)) }) { nav.tab(Routes.HOME) }
+                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
+                BidWonScreen(t, { nav.go(Routes.trip(t.id)) { popUpTo(Routes.BID_WON) { inclusive = true } } }) { nav.navigateToHome() }
             }
             composable(Routes.MY_TRIPS) {
-                MyTripsScreen(trips, predefined, { nav.navigate(Routes.trip(it.id)) }, { nav.navigate(Routes.predefForm(it.id)) }, { nav.navigate(Routes.predefForm(null)) },
-                    { nav.navigate(Routes.CALENDAR) }, { nav.navigate(Routes.HISTORY) })
+                MyTripsScreen(trips, predefined, { nav.go(Routes.trip(it.id)) }, { nav.go(Routes.predefForm(it.id)) }, { nav.go(Routes.predefForm(null)) },
+                    { nav.go(Routes.CALENDAR) }, { nav.go(Routes.HISTORY) })
             }
             composable(Routes.TRIP) { e ->
-                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable
-                TripDetailScreen(t, { nav.popBackStack() }, { vm.setTripStatus(t.id, TripStatus.ON_THE_WAY); nav.navigate(Routes.live(t.id)) })
+                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
+                TripDetailScreen(t, { nav.popBackStack() }, { vm.setTripStatus(t.id, TripStatus.ON_THE_WAY); nav.go(Routes.live(t.id)) })
             }
             composable(Routes.LIVE) { e ->
-                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable
-                LiveTripScreen(t, { vm.setTripStatus(t.id, it) }, onCollect = { nav.navigate(Routes.collect(t.id)) })
+                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
+                LiveTripScreen(t, { vm.setTripStatus(t.id, it) }, onCollect = { nav.go(Routes.collect(t.id)) })
             }
             composable(Routes.COLLECT) { e ->
-                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable
-                CollectPaymentScreen(t, { nav.popBackStack() }) { m -> vm.setTripStatus(t.id, TripStatus.COMPLETED, m); nav.navigate(Routes.done(t.id)) }
+                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
+                CollectPaymentScreen(t, { nav.popBackStack() }) { m -> vm.setTripStatus(t.id, TripStatus.COMPLETED, m); nav.go(Routes.done(t.id)) { popUpTo(Routes.TRIP) { inclusive = true } } }
             }
             composable(Routes.COMPLETED) { e ->
-                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable
-                TripCompletedScreen(t) { nav.tab(Routes.HOME) }
+                val t = trips.firstOrNull { it.id == e.arguments?.getString("tripId") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
+                TripCompletedScreen(t) { nav.navigateToHome() }
             }
-            composable(Routes.PREDEF) { PredefinedListScreen(predefined, { nav.popBackStack() }, { nav.navigate(Routes.predefForm(it.id)) }) { nav.navigate(Routes.predefForm(null)) } }
+            composable(Routes.PREDEF) { PredefinedListScreen(predefined, { nav.popBackStack() }, { nav.go(Routes.predefForm(it.id)) }) { nav.go(Routes.predefForm(null)) } }
             composable(Routes.PREDEF_FORM, arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null })) { e ->
                 val id = e.arguments?.getString("id")
                 PredefinedFormScreen(predefined.firstOrNull { it.id == id }, { nav.popBackStack() }) { vm.savePredefined(it); nav.popBackStack() }
             }
             composable(Routes.CALENDAR) { AvailabilityScreen(trips, blocked, vm::toggleDay) { nav.popBackStack() } }
-            composable(Routes.HISTORY) { TripHistoryScreen(trips, { nav.popBackStack() }) { nav.navigate(Routes.trip(it.id)) } }
+            composable(Routes.HISTORY) { TripHistoryScreen(trips, { nav.popBackStack() }) { nav.go(Routes.trip(it.id)) } }
             composable(Routes.RATINGS) { RatingsScreen(driver.rating, ratings) { nav.popBackStack() } }
 
             composable(Routes.EARNINGS) {
-                EarningsScreen(summary, { vm.resetWithdraw(); nav.navigate(Routes.WITHDRAW) }, { nav.navigate(Routes.WALLET) }, { nav.navigate(Routes.RECON) }, { nav.navigate(Routes.RATINGS) }, driver.rating)
+                EarningsScreen(summary, { vm.resetWithdraw(); nav.go(Routes.WITHDRAW) }, { nav.go(Routes.WALLET) }, { nav.go(Routes.RECON) }, { nav.go(Routes.RATINGS) }, driver.rating)
             }
             composable(Routes.WITHDRAW) {
-                LaunchedEffect(wd.done) { if (wd.done != null) nav.navigate(Routes.WITHDRAW_OK) { popUpTo(Routes.WITHDRAW) { inclusive = true } } }
+                LaunchedEffect(wd.done) { if (wd.done != null) nav.go(Routes.WITHDRAW_OK) { popUpTo(Routes.WITHDRAW) { inclusive = true } } }
                 WithdrawScreen(summary.walletBalance, vm.accounts, wd, vm::setWdAccount, vm::setWdAmount, vm::setPin, vm::confirmWithdraw) { nav.popBackStack() }
             }
-            composable(Routes.WITHDRAW_OK) { wd.done?.let { WithdrawSuccessScreen(it, wd.account) { nav.tab(Routes.EARNINGS) } } }
+            composable(Routes.WITHDRAW_OK) {
+                val done = wd.done
+                if (done == null) MissingContent({ nav.navigateToTabFresh(Routes.EARNINGS) }) { nav.navigateToHome() }
+                else WithdrawSuccessScreen(done, wd.account) { nav.navigateToTabFresh(Routes.EARNINGS) }
+            }
             composable(Routes.RECON) { ReconciliationScreen(recon, vm::loadReconciliation) { nav.popBackStack() } }
-            composable(Routes.WALLET) { WalletScreen(summary.walletBalance, txs, { nav.popBackStack() }) { vm.resetWithdraw(); nav.navigate(Routes.WITHDRAW) } }
+            composable(Routes.WALLET) { WalletScreen(summary.walletBalance, txs, { nav.popBackStack() }) { vm.resetWithdraw(); nav.go(Routes.WITHDRAW) } }
 
             composable(Routes.PROFILE) {
-                ProfileScreen(driver, { nav.navigate(Routes.VEHICLES) }, { nav.navigate(Routes.RATINGS) }, { nav.navigate(Routes.HISTORY) }, { nav.navigate(Routes.PREDEF) },
-                    { nav.navigate(Routes.CALENDAR) }, { nav.navigate(Routes.WALLET) }, { nav.navigate(Routes.SUPPORT) }, { nav.navigate(Routes.NOTIFS) },
-                    { nav.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }, onLanguage = { nav.navigate(Routes.LANGUAGE) })
+                ProfileScreen(driver, { nav.go(Routes.VEHICLES) }, { nav.go(Routes.RATINGS) }, { nav.go(Routes.HISTORY) }, { nav.go(Routes.PREDEF) },
+                    { nav.go(Routes.CALENDAR) }, { nav.go(Routes.WALLET) }, { nav.go(Routes.SUPPORT) }, { nav.go(Routes.NOTIFS) },
+                    { nav.navigateToLogin() }, onLanguage = { nav.go(Routes.LANGUAGE) })
             }
             composable(Routes.VEHICLES) { VehiclesScreen(driver) { nav.popBackStack() } }
             composable(Routes.NOTIFS) { NotificationsScreen(notifs) { nav.popBackStack() } }
             composable(Routes.SUPPORT) { SupportScreen { nav.popBackStack() } }
+          }
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = banner != null && current !in setOf(Routes.SPLASH, Routes.LANGUAGE_PROMPT, Routes.LOGIN, Routes.OTP),
@@ -231,7 +241,7 @@ fun DriverApp(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp),
         ) {
             banner?.let { b ->
-                LiveBannerCard(b, onOpen = { vm.dismissBanner(); if (b.route == "requests") nav.tab(Routes.REQUESTS) else nav.navigate(b.route) }, onDismiss = vm::dismissBanner)
+                LiveBannerCard(b, onOpen = { vm.dismissBanner(); nav.openDeepLink(b.route) }, onDismiss = vm::dismissBanner)
             }
         }
         // Auto-hide non-critical banners.
@@ -243,7 +253,7 @@ fun DriverApp(
         ModalBottomSheet(onDismissRequest = { bidSheet = null }, containerColor = Color.White) {
             BidDetailSheetContent(b) {
                 bidSheet = null
-                vm.simulateWin(b.id) { trip -> nav.navigate(Routes.won(trip.id)) }
+                vm.simulateWin(b.id) { trip -> nav.go(Routes.won(trip.id)) }
             }
         }
     }

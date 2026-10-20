@@ -414,4 +414,6 @@
     <string name="n_request_body">%1$s → %2$s · %3$s · %4$s–%5$s</string>
     <string name="n_accepted_title">🎉 Customer accepted your bid!</string>
     <string name="n_accepted_body">Trip %1$s confirmed. Slot locked.</string>
+    <string name="not_available_title">Not available</string>
+    <string name="not_available_body">This item is no longer available. It may have been cancelled or already completed.</string>
 </resources>
