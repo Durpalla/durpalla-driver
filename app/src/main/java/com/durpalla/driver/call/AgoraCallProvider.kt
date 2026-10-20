@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 /**
  * Agora voice (audio only, COMMUNICATION profile, SPEECH_STANDARD + CHATROOM). Ringing/status/missed/callLog are the
  * shared REST + Firestore calls/{callId} flow; there is no SDP/ICE. Token, App ID, channel (call_{callId}) and uid
- * all come from GET /calls/{callId}/agora-token; the token is renewed on onTokenPrivilegeWillExpire.
+ * come in `agora` of the POST /calls (caller) / accept (callee) response; renewed via POST /calls/{callId}/token on onTokenPrivilegeWillExpire.
  */
 class AgoraCallProvider(
     private val ctx: Context,
@@ -45,24 +45,25 @@ class AgoraCallProvider(
     override fun startCall(tripId: String, peerName: String) {
         if (busy) return
         set(CallState.Outgoing(tripId, peerName, null, System.currentTimeMillis()))
-        scope.launch { api.start(tripId).onSuccess { begin(tripId, peerName, it.callId) }.onFailure { fail(it) } }
+        scope.launch { api.start(tripId).onSuccess { begin(tripId, peerName, it) }.onFailure { fail(it) } }
     }
 
-    override fun continueOutgoing(tripId: String, peerName: String, callId: String) {
+    override fun continueOutgoing(tripId: String, peerName: String, started: StartedCall) {
         if (busy) return
-        set(CallState.Outgoing(tripId, peerName, callId, System.currentTimeMillis()))
-        begin(tripId, peerName, callId)
+        set(CallState.Outgoing(tripId, peerName, started.callId, System.currentTimeMillis()))
+        begin(tripId, peerName, started)
     }
 
     /** Caller joins the channel right away (so audio is ready on answer); the callee joins on Accept. */
-    private fun begin(tripId: String, peerName: String, id: String) {
+    private fun begin(tripId: String, peerName: String, started: StartedCall) {
+        val id = started.callId
         asCaller = true; callId = id
         (_state.value as? CallState.Outgoing)?.let { set(it.copy(callId = id)) }
         scope.launch {
             runCatching {
                 signaling.ensureSignedIn()
                 listener = signaling.listen(id) { d -> onDoc(d) }
-                join(id)
+                join(started.agora ?: throw CallException(CallError.PROVIDER_UNAVAILABLE, "no agora in start response"))
             }.onFailure { fail(it) }
         }
         armTimeout()
@@ -80,7 +81,8 @@ class AgoraCallProvider(
         val s = _state.value as? CallState.Incoming ?: return
         timeout?.cancel()
         set(CallState.Connecting(s.call.callId, s.call.tripId, s.call.callerName))
-        scope.launch { runCatching { api.accept(s.call.callId).getOrThrow(); join(s.call.callId) }.onFailure { fail(it) } }
+        scope.launch { runCatching { val a = api.accept(s.call.callId).getOrThrow()
+            join(a.agora ?: throw CallException(CallError.PROVIDER_UNAVAILABLE, "no agora in accept response")) }.onFailure { fail(it) } }
     }
 
     override fun decline() { val id = callId ?: return; scope.launch { api.decline(id) }; finish(EndReason.DECLINED) }
@@ -121,8 +123,7 @@ class AgoraCallProvider(
         }
     }
 
-    private suspend fun join(id: String) {
-        val t = api.agoraToken(id).getOrThrow()
+    private fun join(t: AgoraToken) {
         val e = engine(t.appId)
         val opts = ChannelMediaOptions().apply {
             channelProfile = Constants.CHANNEL_PROFILE_COMMUNICATION
@@ -164,7 +165,7 @@ class AgoraCallProvider(
         }
         override fun onTokenPrivilegeWillExpire(token: String?) {
             val id = callId ?: return
-            scope.launch { api.agoraToken(id).onSuccess { engine?.renewToken(it.token) }.onFailure { Log.w(TAG, "token renew failed", it) } }
+            scope.launch { api.renewToken(id).onSuccess { engine?.renewToken(it.token) }.onFailure { Log.w(TAG, "token renew failed", it) } }
         }
         override fun onNetworkQuality(uid: Int, txQuality: Int, rxQuality: Int) { if (uid == 0) { quality.onNetworkQuality(txQuality, rxQuality); publishWeak() } }
         override fun onRtcStats(stats: RtcStats?) { stats ?: return; quality.onRtcStats(stats.txPacketLossRate, stats.rxPacketLossRate, stats.lastmileDelay); publishWeak() }

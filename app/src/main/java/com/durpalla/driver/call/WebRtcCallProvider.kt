@@ -71,18 +71,18 @@ class WebRtcCallProvider(
     private val busy get() = _state.value !is CallState.Idle && _state.value !is CallState.Ended
 
     override fun startCall(tripId: String, peerName: String) = begin(tripId, peerName, null)
-    override fun continueOutgoing(tripId: String, peerName: String, callId: String) = begin(tripId, peerName, callId)
+    override fun continueOutgoing(tripId: String, peerName: String, started: StartedCall) = begin(tripId, peerName, started)
 
-    private fun begin(tripId: String, peerName: String, started: String?) {
+    private fun begin(tripId: String, peerName: String, pre: StartedCall?) {
         if (busy) return
         asCaller = true
         set(CallState.Outgoing(tripId, peerName, null, System.currentTimeMillis()))
         scope.launch {
             runCatching {
                 signaling.ensureSignedIn()
-                val id = started ?: api.start(tripId).getOrThrow().callId; callId = id
+                val started = pre ?: api.start(tripId).getOrThrow(); val id = started.callId; callId = id
                 (_state.value as? CallState.Outgoing)?.let { set(it.copy(callId = id)) } ?: return@launch
-                val peer = createPeer(id)
+                val peer = createPeer(id, started.ice)
                 val offer = peer.createOffer().munged()
                 peer.setLocal(offer)
                 signaling.writeOffer(id, Sdp("offer", offer.description))
@@ -108,10 +108,10 @@ class WebRtcCallProvider(
         scope.launch {
             runCatching {
                 signaling.ensureSignedIn()
-                api.accept(s.call.callId).getOrThrow()
+                val accepted = api.accept(s.call.callId).getOrThrow()
                 val doc = signaling.read(s.call.callId) ?: throw CallException(CallError.NOT_FOUND)
                 val offer = doc.offer ?: waitForOffer(s.call.callId)
-                val peer = createPeer(s.call.callId)
+                val peer = createPeer(s.call.callId, accepted.ice)
                 lastRemoteOffer = offer.sdp
                 peer.setRemote(SessionDescription(SessionDescription.Type.OFFER, offer.sdp)); remoteSet = true; flushRemote()
                 val answer = peer.createAnswer().munged()
@@ -207,8 +207,9 @@ class WebRtcCallProvider(
         throw CallException(CallError.NOT_FOUND, "no offer")
     }
 
-    private suspend fun createPeer(id: String): PeerConnection {
-        val ice = api.iceServers().getOrDefault(IceConfig.FALLBACK).servers.map { s ->
+    /** ICE from the start/accept response; GET /calls/ice-servers only when it was null. */
+    private suspend fun createPeer(id: String, fromResponse: IceConfig?): PeerConnection {
+        val ice = (fromResponse ?: api.iceServers().getOrDefault(IceConfig.FALLBACK)).servers.map { s ->
             PeerConnection.IceServer.builder(s.urls).apply { s.username?.let(::setUsername); s.credential?.let(::setPassword) }.createIceServer()
         }
         val cfg = PeerConnection.RTCConfiguration(ice).apply { sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN; continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY }

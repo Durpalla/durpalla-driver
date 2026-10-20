@@ -10,12 +10,12 @@ import java.net.URL
 
 /** REST side of calling (docs/calling-contract.md). All calls use `Authorization: Bearer <token>`. */
 interface CallApi {
-    suspend fun start(tripId: String): Result<StartedCall>               // POST /calls {tripId} -> {callId, provider}
-    suspend fun accept(callId: String): Result<Unit>                     // POST /calls/{callId}/accept
+    suspend fun start(tripId: String): Result<StartedCall>               // POST /calls {tripId} -> {callId, provider, agora|iceServers}
+    suspend fun accept(callId: String): Result<StartedCall>              // POST /calls/{callId}/accept -> same shape as start
     suspend fun decline(callId: String): Result<Unit>                    // POST /calls/{callId}/decline
     suspend fun end(callId: String, reason: String): Result<Unit>        // POST /calls/{callId}/end {reason}
-    suspend fun iceServers(): Result<IceConfig>                          // GET /calls/ice-servers
-    suspend fun agoraToken(callId: String): Result<AgoraToken>           // GET /calls/{callId}/agora-token
+    suspend fun iceServers(): Result<IceConfig>                          // GET /calls/ice-servers (fallback only)
+    suspend fun renewToken(callId: String): Result<RenewedToken>         // POST /calls/{callId}/token (agora)
 }
 
 object CallJson {
@@ -27,12 +27,19 @@ object CallJson {
 
     /** Accepts the bare object or the `{data: {...}}` envelope. Missing provider → webrtc. */
     private fun obj(body: String) = JsonParser.parseString(body).asJsonObject.let { o -> o["data"]?.takeIf { it.isJsonObject }?.asJsonObject ?: o }
+    private fun com.google.gson.JsonObject.opt(k: String) = this[k]?.takeIf { !it.isJsonNull }
     fun started(body: String): StartedCall = obj(body).let { o ->
-        StartedCall(o["callId"].asString, CallProviderKind.of(o["provider"]?.takeIf { !it.isJsonNull }?.asString))
+        val provider = CallProviderKind.of(o.opt("provider")?.asString)
+        val agora = o.opt("agora")?.asJsonObject?.let { agoraToken(it) }
+        val ice = o.opt("iceServers")?.takeIf { it.isJsonArray && it.asJsonArray.size() > 0 }?.let { arr ->
+            val wrapped = com.google.gson.JsonObject().apply { add("iceServers", arr); o.opt("ttl")?.let { add("ttl", it) } }
+            iceServers(wrapped.toString())
+        }
+        StartedCall(o["callId"].asString, provider, agora, ice)
     }
-    fun agoraToken(body: String): AgoraToken = obj(body).let { o ->
-        AgoraToken(o["appId"].asString, o["channel"].asString, o["token"].asString, o["uid"].asLong.toInt(), o["expiresAt"]?.takeIf { !it.isJsonNull }?.asLong ?: 0)
-    }
+    fun agoraToken(o: com.google.gson.JsonObject): AgoraToken =
+        AgoraToken(o["appId"].asString, o["channel"].asString, o["token"].asString, o["uid"].asLong.toInt(), o.opt("expiresAt")?.asLong ?: 0)
+    fun renewed(body: String): RenewedToken = obj(body).let { o -> RenewedToken(o["token"].asString, o.opt("expiresAt")?.asLong ?: 0) }
 
     /** Accepts `[{urls,username,credential}]` or `{iceServers:[...], ttl}`; `urls` may be a string or an array. */
     fun iceServers(body: String): IceConfig {
@@ -69,8 +76,8 @@ class HttpCallApi(private val baseUrl: String, private val token: () -> String?)
     }
 
     override suspend fun start(tripId: String) = call("POST", "/calls", CallJson.start(tripId)).mapCatching { CallJson.started(it) }
-    override suspend fun agoraToken(callId: String) = call("GET", "/calls/$callId/agora-token").mapCatching { CallJson.agoraToken(it) }
-    override suspend fun accept(callId: String) = call("POST", "/calls/$callId/accept", "{}").map { }
+    override suspend fun renewToken(callId: String) = call("POST", "/calls/$callId/token", "{}").mapCatching { CallJson.renewed(it) }
+    override suspend fun accept(callId: String) = call("POST", "/calls/$callId/accept", "{}").mapCatching { CallJson.started(it) }
     override suspend fun decline(callId: String) = call("POST", "/calls/$callId/decline", "{}").map { }
     override suspend fun end(callId: String, reason: String) = call("POST", "/calls/$callId/end", CallJson.end(reason)).map { }
 

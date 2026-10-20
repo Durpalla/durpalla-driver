@@ -13,7 +13,7 @@ interface CallProvider {
     val state: StateFlow<CallState>
     fun startCall(tripId: String, peerName: String)
     /** POST /calls already ran (by [CallProviderRouter]); continue the outgoing call on this provider. */
-    fun continueOutgoing(tripId: String, peerName: String, callId: String)
+    fun continueOutgoing(tripId: String, peerName: String, started: StartedCall)
     /** FCM `call.incoming` (or the Pusher secondary path). Ignored when already in a call (server gets busy via decline). */
     fun onIncoming(call: IncomingCall)
     fun accept()
@@ -39,10 +39,10 @@ class FakeCallProvider(
 
     private fun ringTimeout() { job?.cancel(); job = scope.launch { delay(CallMachine.RING_TIMEOUT_MS); if (CallMachine.ringTimedOut(_state.value, now())) _state.value = CallMachine.ended(_state.value, EndReason.MISSED, now()) } }
 
-    override fun startCall(tripId: String, peerName: String) = continueOutgoing(tripId, peerName, "fake-call-${n + 1}")
-    override fun continueOutgoing(tripId: String, peerName: String, callId: String) {
+    override fun startCall(tripId: String, peerName: String) = continueOutgoing(tripId, peerName, StartedCall("fake-call-${n + 1}", CallProviderKind.WEBRTC))
+    override fun continueOutgoing(tripId: String, peerName: String, started: StartedCall) {
         if (_state.value !is CallState.Idle && _state.value !is CallState.Ended) return
-        n++; val id = callId
+        n++; val id = started.callId
         _state.value = CallState.Outgoing(tripId, peerName, id, now())
         job?.cancel()
         job = scope.launch {

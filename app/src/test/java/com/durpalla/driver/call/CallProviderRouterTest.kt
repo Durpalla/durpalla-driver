@@ -14,11 +14,11 @@ class CallProviderRouterTest {
         val ended = mutableListOf<Pair<String, String>>(); val declined = mutableListOf<String>()
         override suspend fun start(tripId: String) = fail?.let { Result.failure<StartedCall>(CallException(it)) }
             ?: Result.success(StartedCall("c-$tripId", provider ?: CallProviderKind.WEBRTC))
-        override suspend fun accept(callId: String) = Result.success(Unit)
+        override suspend fun accept(callId: String) = Result.success(StartedCall(callId, CallProviderKind.AGORA))
         override suspend fun decline(callId: String) = Result.success(Unit).also { declined += callId }
         override suspend fun end(callId: String, reason: String) = Result.success(Unit).also { ended += callId to reason }
         override suspend fun iceServers() = Result.success(IceConfig.FALLBACK)
-        override suspend fun agoraToken(callId: String) = Result.success(AgoraToken("app", "call_$callId", "007x", 1, 0))
+        override suspend fun renewToken(callId: String) = Result.success(RenewedToken("007x", 0))
     }
 
     private fun TestScope.setup(api: StubApi): Triple<CallProviderRouter, FakeCallProvider, FakeCallProvider> {
