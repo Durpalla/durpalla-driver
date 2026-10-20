@@ -114,3 +114,30 @@ Deliver every event over both Pusher and FCM. The app de-duplicates (`accepted()
 `ui/components/Buttons.kt`: `DurpallaButton(variant = Primary | Accent | Secondary | Text | Danger | OnDark, size = Large | Medium | Small, loading, icon)`,
 plus `DurpallaIconButton` and `DurpallaFab`. Use **Accent** (#F28C28) only for each screen's key CTA (Place bid, Send OTP, Withdraw, Start trip).
 Chips and switches use `brandChipColors()` / `brandSwitchColors()`.
+
+## Language: Bangla / English
+
+- **First run**: after the splash the driver sees a bilingual prompt (*ভাষা নির্বাচন করুন / Choose your language*) with two large options, **বাংলা** and **English**. It only appears while no language is saved.
+- **Persistence and applying**: the choice is saved in DataStore (`durpalla_settings` › `app_language`) and applied with `AppCompatDelegate.setApplicationLocales(LocaleListCompat)`. `DriverApplication` restores it on every launch (`LanguageManager.restore()`).
+  - On Android 13+ the system per-app language screen works through `res/xml/locales_config.xml` plus `android:localeConfig`. A change made there wins and is saved back to DataStore.
+  - On Android 12 and below, AppCompat's `AppLocalesMetadataHolderService` (`autoStoreLocales=true`) applies the locale. `MainActivity` is an `AppCompatActivity` for that reason.
+- **Settings**: Profile › Language (ভাষা) switches the language live and renames the notification channels.
+- **Strings**: every UI string is in `res/values/strings.xml`, and the full Bangla translation is in `res/values-bn/strings.xml`, including plurals, notification channels and notification text. Lint treats `MissingTranslation`, `ExtraTranslation` and `MissingQuantity` as **errors** (`./gradlew lintDebug`).
+  - Brand names, the language names and the bilingual prompt are `translatable="false"`.
+  - Text built in the ViewModel, repositories or realtime layer is a `UiText` (resource id plus args) that is resolved in the current language when displayed.
+- **Digits**: `i18n/DigitFormatter`.
+  - `toLocalDigits()` is for **display only**. In Bangla every digit (money, phone, dates, times, counts, bids, OTP boxes, ratings) is shown as ০-৯.
+  - `toAsciiDigits()` and `digitsOnly()` normalise every input (phone, OTP, PIN, bid, withdrawal, seats, rent) **before** validation, state, storage or the API. A Bangla keyboard's ০-৯ therefore always reaches the server as 0-9.
+  - API bodies (`data/ApiJson`) use Gson and `Int`. Use `Locale.ROOT` or `Locale.US` for any string formatting of API values, and never `String.format` with the default locale.
+  - Money is shown as `৳৩,১০০`, with lakh grouping above 99,999 (`৳১,২৩,৪৫৬`). Times are shown as `সকাল ৮:০০–১০:০০` and dates as `শুক্র, ২৩ অক্টোবর`.
+  - API keys stay English or ASCII: weekday keys `Sat…Fri`, document keys `nid/licence/…`, period keys `this_week`, `2026-10`.
+- **Backend**: reasons in `bid.rejected` and `trip.cancelled` are shown verbatim. Send them empty to get the translated default, or localise them server-side using the driver's language. Place names, customer names and notification history come from the API and are shown as sent; only their digits are localised.
+
+### Font: SolaimanLipi
+
+- **File**: `app/src/main/res/font/solaiman_lipi.ttf`, SolaimanLipi v1.6.1 by Ekushey (ekushey.org).
+- **Download**: the OmicronLab distribution, https://www.omicronlab.com/download/fonts/SolaimanLipi_20-04-07.ttf (sha256 `16bbf4f0140dab8fcf53ab34a923674ea8c9de2f8583d110c7e62b0094a22fe6`).
+- **License**: the font's own name table says *"This Font Software is licensed under the SIL Open Font License, Version 1.0"* (http://scripts.sil.org/OFL). The OFL allows bundling and redistributing the font with software. The file is shipped unmodified; OS/2 `fsType` 0x0100 forbids subsetting, so it is not subset.
+- **Typography**: when Bangla is selected the whole Material typography uses SolaimanLipi with `lineHeight = 1.5em`, `includeFontPadding = true` and `LineHeightStyle.Trim.None`, so matras and conjuncts never clip. English keeps the default system font. Because the line height is in em, it scales with any `fontSize` override.
+
+Tests: `i18n/DigitFormatterTest`, `SlotLabelTest`, `LanguageManagerTest`, `ui/BanglaInputTest` (a Bangla-digit bid, phone, OTP or withdrawal reaches the API as ASCII) and `ui/BanglaScreenshotTest` (Roborazzi, `build/shots/driver_bn_*.png`).

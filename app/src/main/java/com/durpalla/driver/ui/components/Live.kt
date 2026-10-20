@@ -1,5 +1,11 @@
 package com.durpalla.driver.ui.components
 
+import androidx.compose.ui.res.stringResource
+import com.durpalla.driver.R
+import com.durpalla.driver.ui.str
+import com.durpalla.driver.ui.title
+import com.durpalla.driver.i18n.l
+import com.durpalla.driver.i18n.asString
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -47,7 +53,7 @@ fun LiveIndicator(state: ConnectionState, modifier: Modifier = Modifier) {
     } else 1f
     Row(modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).alpha(if (state == ConnectionState.LIVE) pulse else 1f).clip(CircleShape).background(fg))
-        Text(" " + if (state == ConnectionState.RECONNECTING) "Reconnecting…" else state.label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(" " + state.title(), color = fg, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -57,20 +63,20 @@ fun LiveBidPanel(request: TripRequest, live: LiveBid?, connection: ConnectionSta
     val count = maxOf(live?.bidCount ?: 0, request.bidsCount)
     DCard(color = DP.Primary100, border = null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Live bidding", style = MaterialTheme.typography.titleSmall, color = DP.Primary700, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.live_bidding), style = MaterialTheme.typography.titleSmall, color = DP.Primary700, modifier = Modifier.weight(1f))
             LiveIndicator(connection)
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile("Bids", "$count", Modifier.weight(1f))
-            StatTile("Lowest bid", live?.lowestBid?.let(::taka) ?: "—", Modifier.weight(1f), DP.Accent)
-            StatTile("Your bid", live?.myAmount?.let(::taka) ?: "—", Modifier.weight(1f), DP.Primary500)
+            StatTile(stringResource(R.string.bids), count.l(), Modifier.weight(1f))
+            StatTile(stringResource(R.string.lowest_bid), live?.lowestBid?.let { taka(it) } ?: stringResource(R.string.placeholder_dash), Modifier.weight(1f), DP.Accent)
+            StatTile(stringResource(R.string.your_bid), live?.myAmount?.let { taka(it) } ?: stringResource(R.string.placeholder_dash), Modifier.weight(1f), DP.Primary500)
         }
         val status = when {
-            live?.status == BidStatus.WON -> "Customer accepted your bid" to DP.Success
-            live?.status == BidStatus.LOST -> "Customer chose another driver" to DP.Danger
-            live?.myAmount != null && live.iAmLowest -> "You're the lowest bid right now" to DP.Success
-            live?.myAmount != null && live.lowestBid != null -> "Outbid by ${taka(live.myAmount - live.lowestBid)}. Customers also weigh rating." to Color(0xFFB45309)
+            live?.status == BidStatus.WON -> stringResource(R.string.live_accepted) to DP.Success
+            live?.status == BidStatus.LOST -> stringResource(R.string.live_lost) to DP.Danger
+            live?.myAmount != null && live.iAmLowest -> stringResource(R.string.live_lowest) to DP.Success
+            live?.myAmount != null && live.lowestBid != null -> str(R.string.live_outbid, taka(live.myAmount - live.lowestBid)) to Color(0xFFB45309)
             else -> null
         }
         status?.let { (t, c) -> Text(t, color = c, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp)) }
@@ -90,13 +96,13 @@ fun LiveBannerCard(b: LiveBanner, onOpen: () -> Unit, onDismiss: () -> Unit, mod
         Row(verticalAlignment = Alignment.Top) {
             Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(b.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                Text(b.body, color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
+                Text(b.title.asString(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text(b.body.asString(), color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
             }
-            IconButton(onDismiss, Modifier.size(28.dp), colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) { Icon(Icons.Filled.Close, "Dismiss") }
+            IconButton(onDismiss, Modifier.size(28.dp), colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) { Icon(Icons.Filled.Close, stringResource(R.string.dismiss)) }
         }
         Spacer(Modifier.height(12.dp))
-        DurpallaButton(if (b.kind == LiveBanner.Kind.ACCEPTED) "View trip" else if (b.kind == LiveBanner.Kind.REQUEST) "View & bid" else "Open", onOpen,
+        DurpallaButton(stringResource(if (b.kind == LiveBanner.Kind.ACCEPTED) R.string.view_trip else if (b.kind == LiveBanner.Kind.REQUEST) R.string.view_and_bid else R.string.open), onOpen,
             variant = if (b.kind == LiveBanner.Kind.ACCEPTED || b.kind == LiveBanner.Kind.REQUEST) ButtonVariant.Accent else ButtonVariant.OnDark, size = ButtonSize.Medium)
     }
 }

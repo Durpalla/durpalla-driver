@@ -1,5 +1,6 @@
 package com.durpalla.driver.ui.components
 
+import com.durpalla.driver.i18n.toLocalDigits
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,7 +41,7 @@ fun DurpallaButton(
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = contentFor(variant))
             Spacer(Modifier.width(10.dp))
         } else if (icon != null) { Icon(icon, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
-        Text(text, fontWeight = FontWeight.SemiBold, fontSize = size.font.sp, maxLines = 1)
+        Text(text.toLocalDigits(), fontWeight = FontWeight.SemiBold, fontSize = size.font.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
     val pad = PaddingValues(horizontal = if (size == ButtonSize.Small) 14.dp else 20.dp)
     when (variant) {
@@ -72,4 +73,4 @@ fun DurpallaIconButton(icon: ImageVector, contentDescription: String?, onClick: 
 @Composable
 fun DurpallaFab(text: String, icon: ImageVector, onClick: () -> Unit) =
     ExtendedFloatingActionButton(onClick = onClick, containerColor = DP.Accent, contentColor = Color.White, shape = DurpallaButtonShape,
-        icon = { Icon(icon, null) }, text = { Text(text, fontWeight = FontWeight.SemiBold) })
+        icon = { Icon(icon, null) }, text = { Text(text.toLocalDigits(), fontWeight = FontWeight.SemiBold) })

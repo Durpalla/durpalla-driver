@@ -12,10 +12,18 @@ import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import com.durpalla.driver.i18n.AppCompatLocaleApplier
+import com.durpalla.driver.i18n.DataStoreLanguageStore
+import com.durpalla.driver.i18n.LanguageManager
 
 class DriverApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Saved language (DataStore) is the default on every launch; a change made in Android 13+ system settings wins.
+        val lang = LanguageManager(DataStoreLanguageStore(this), AppCompatLocaleApplier, LanguageManager::appCompatSelected)
+        ServiceLocator.language = lang
+        runBlocking { lang.restore() }
         Channels.create(this)
         ServiceLocator.botProtection = RecaptchaBotProtection.create(this, BuildConfig.RECAPTCHA_SITE_KEY)
         // Firebase is only initialised when google-services.json was present at build time.

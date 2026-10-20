@@ -1,5 +1,9 @@
 package com.durpalla.driver.notifications
 
+import com.durpalla.driver.i18n.UiText
+import com.durpalla.driver.i18n.L10n
+import com.durpalla.driver.i18n.reasonText
+import com.durpalla.driver.ui.res
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -36,28 +40,31 @@ object Channels {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+        // Names/descriptions follow the app language; re-creating with the same id just renames the channel.
+        val c = L10n.localized(ctx)
         nm.createNotificationChannels(listOf(
-            NotificationChannel(TRIP_REQUESTS, "Trip requests", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "New customer trip requests near you"; enableVibration(true); setSound(sound, attrs)
+            NotificationChannel(TRIP_REQUESTS, c.getString(R.string.ch_trip_requests), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = c.getString(R.string.ch_trip_requests_desc); enableVibration(true); setSound(sound, attrs)
             },
-            NotificationChannel(BIDS, "Bids", NotificationManager.IMPORTANCE_HIGH).apply { description = "Bid accepted, outbid, rejected" },
-            NotificationChannel(PAYMENTS, "Payments", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Payments and payouts" },
-            NotificationChannel(GENERAL, "General", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(BIDS, c.getString(R.string.ch_bids), NotificationManager.IMPORTANCE_HIGH).apply { description = c.getString(R.string.ch_bids_desc) },
+            NotificationChannel(PAYMENTS, c.getString(R.string.ch_payments), NotificationManager.IMPORTANCE_DEFAULT).apply { description = c.getString(R.string.ch_payments_desc) },
+            NotificationChannel(GENERAL, c.getString(R.string.ch_general), NotificationManager.IMPORTANCE_LOW).apply { description = c.getString(R.string.ch_general_desc) },
         ))
     }
 }
 
-data class NotificationSpec(val channel: String, val title: String, val body: String, val route: String, val urgent: Boolean = false)
+data class NotificationSpec(val channel: String, val title: UiText, val body: UiText, val route: String, val urgent: Boolean = false)
 
 object NotificationFactory {
     /** Maps an event to what (if anything) should be shown. Pure; unit-testable. */
     fun spec(e: RealtimeEvent): NotificationSpec? = when (e) {
-        is RealtimeEvent.TripRequested -> NotificationSpec(Channels.TRIP_REQUESTS, "New ${e.request.vehicleType.label} request",
-            "${e.request.from} → ${e.request.to} · ${e.request.passengers} pax · ${taka(e.request.suggestedMin)}–${taka(e.request.suggestedMax)}", DeepLink.request(e.request.id), urgent = true)
-        is RealtimeEvent.BidAccepted -> NotificationSpec(Channels.BIDS, "🎉 Customer accepted your bid!", "Trip ${e.tripCode} confirmed. Slot locked.", DeepLink.won(e.tripId), urgent = true)
-        is RealtimeEvent.BidRejected -> NotificationSpec(Channels.BIDS, "Bid not selected", e.reason, DeepLink.BIDS)
-        is RealtimeEvent.TripCancelled -> NotificationSpec(Channels.GENERAL, "Trip cancelled", e.reason, DeepLink.trip(e.tripId))
-        is RealtimeEvent.PaymentReceived -> NotificationSpec(Channels.PAYMENTS, "Payment received", "${taka(e.amount)} via ${e.method.label}", DeepLink.WALLET)
+        is RealtimeEvent.TripRequested -> NotificationSpec(Channels.TRIP_REQUESTS, UiText.res(R.string.banner_new_request, UiText.res(e.request.vehicleType.res)),
+            UiText.res(R.string.n_request_body, e.request.from, e.request.to, UiText.plural(R.plurals.pax, e.request.passengers, e.request.passengers),
+                UiText.Taka(e.request.suggestedMin), UiText.Taka(e.request.suggestedMax)), DeepLink.request(e.request.id), urgent = true)
+        is RealtimeEvent.BidAccepted -> NotificationSpec(Channels.BIDS, UiText.res(R.string.n_accepted_title), UiText.res(R.string.n_accepted_body, e.tripCode), DeepLink.won(e.tripId), urgent = true)
+        is RealtimeEvent.BidRejected -> NotificationSpec(Channels.BIDS, UiText.res(R.string.banner_not_selected), reasonText(e.reason, R.string.reason_other_driver), DeepLink.BIDS)
+        is RealtimeEvent.TripCancelled -> NotificationSpec(Channels.GENERAL, UiText.res(R.string.banner_cancelled), reasonText(e.reason, R.string.reason_cancelled_customer), DeepLink.trip(e.tripId))
+        is RealtimeEvent.PaymentReceived -> NotificationSpec(Channels.PAYMENTS, UiText.res(R.string.banner_payment), UiText.res(R.string.banner_payment_body, UiText.Taka(e.amount), UiText.res(e.method.res)), DeepLink.WALLET)
         else -> null
     }
 }
@@ -65,8 +72,9 @@ object NotificationFactory {
 object Notifier {
     fun canPost(ctx: Context) = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun show(ctx: Context, spec: NotificationSpec) {
-        if (!canPost(ctx)) return
+    fun show(base: Context, spec: NotificationSpec) {
+        if (!canPost(base)) return
+        val ctx = L10n.localized(base)
         val intent = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(DeepLink.EXTRA, spec.route)
@@ -74,7 +82,7 @@ object Notifier {
         val pi = PendingIntent.getActivity(ctx, spec.route.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, spec.channel)
             .setSmallIcon(R.drawable.ic_stat_durpalla).setColor(0xFF0E5F7E.toInt())
-            .setContentTitle(spec.title).setContentText(spec.body).setStyle(NotificationCompat.BigTextStyle().bigText(spec.body))
+            .setContentTitle(spec.title.resolve(ctx)).setContentText(spec.body.resolve(ctx)).setStyle(NotificationCompat.BigTextStyle().bigText(spec.body.resolve(ctx)))
             .setAutoCancel(true).setContentIntent(pi)
             .setPriority(if (spec.urgent) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(if (spec.urgent) NotificationCompat.CATEGORY_CALL else NotificationCompat.CATEGORY_MESSAGE)

@@ -1,5 +1,12 @@
 package com.durpalla.driver.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.durpalla.driver.ui.str
+import com.durpalla.driver.ui.title
+import com.durpalla.driver.i18n.l
+import com.durpalla.driver.i18n.toLocalDigits
+import com.durpalla.driver.i18n.DigitFormatter
+import com.durpalla.driver.i18n.asString
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -82,7 +89,7 @@ fun BrandBackground(content: @Composable BoxScope.() -> Unit) {
  * stays reachable on small screens with the keyboard open.
  */
 @Composable
-private fun BrandedAuthLayout(onBack: (() -> Unit)? = null, card: @Composable ColumnScope.() -> Unit) {
+internal fun BrandedAuthLayout(onBack: (() -> Unit)? = null, card: @Composable ColumnScope.() -> Unit) {
     BrandBackground {
         BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
             val minH = maxHeight
@@ -92,18 +99,18 @@ private fun BrandedAuthLayout(onBack: (() -> Unit)? = null, card: @Composable Co
             ) {
               Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.fillMaxWidth().height(40.dp)) {
-                    if (onBack != null) IconButton(onBack, Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.14f)), colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    if (onBack != null) IconButton(onBack, Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.14f)), colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 }
                 // Header
                 Box(Modifier.size(84.dp).shadow(12.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp)).background(Color.White), contentAlignment = Alignment.Center) {
-                    Image(painterResource(R.drawable.durpalla_icon), "Durpalla", Modifier.size(64.dp))
+                    Image(painterResource(R.drawable.durpalla_icon), stringResource(R.string.brand_durpalla), Modifier.size(64.dp))
                 }
                 Spacer(Modifier.height(14.dp))
-                Text("Durpalla Driver", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text("Get trips. Bid smart. Earn more.", color = DP.Primary200, fontSize = 14.sp)
+                Text(stringResource(R.string.app_name), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.auth_tagline), color = DP.Primary200, fontSize = 14.sp)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Motif(Icons.Filled.DirectionsBoat, "Boat"); Motif(Icons.Filled.LocalTaxi, "Taxi"); Motif(Icons.Filled.DirectionsBus, "Micro")
+                    Motif(Icons.Filled.DirectionsBoat, stringResource(R.string.motif_boat)); Motif(Icons.Filled.LocalTaxi, stringResource(R.string.motif_taxi)); Motif(Icons.Filled.DirectionsBus, stringResource(R.string.motif_micro))
                 }
                 Spacer(Modifier.height(24.dp))
               }
@@ -112,7 +119,7 @@ private fun BrandedAuthLayout(onBack: (() -> Unit)? = null, card: @Composable Co
                     Modifier.widthIn(max = 440.dp).fillMaxWidth().shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = DP.Primary700).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(22.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp), content = card,
                 )
-                Text("Powered by Durpalla Limited", modifier = Modifier.padding(top = 24.dp), color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                Text(stringResource(R.string.powered_by), modifier = Modifier.padding(top = 24.dp), color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
             }
         }
     }
@@ -133,29 +140,31 @@ private fun AccentCta(text: String, enabled: Boolean, loading: Boolean = false, 
 fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> Unit) {
     val local = state.phone.removePrefix("0")
     BrandedAuthLayout {
-        Text("Log in to start driving", style = MaterialTheme.typography.titleLarge, color = DP.Ink)
-        Text("Enter your mobile number. We'll send a 6-digit code.", color = DP.Muted, fontSize = 13.sp)
+        Text(stringResource(R.string.login_title), style = MaterialTheme.typography.titleLarge, color = DP.Ink)
+        Text(stringResource(R.string.login_sub), color = DP.Muted, fontSize = 13.sp)
         OutlinedTextField(
-            value = local, onValueChange = { v -> val d = v.filter(Char::isDigit).removePrefix("0").take(10); onPhone(if (d.isEmpty()) "" else "0$d") },
+            value = local.toLocalDigits(), onValueChange = { v -> val d = DigitFormatter.digitsOnly(v).removePrefix("0").take(10); onPhone(if (d.isEmpty()) "" else "0$d") },
             modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp),
             leadingIcon = {
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("🇧🇩", fontSize = 18.sp); Text(" +880", fontWeight = FontWeight.SemiBold, color = DP.Ink)
+                    Text("🇧🇩", fontSize = 18.sp); Text(" +880".toLocalDigits(), fontWeight = FontWeight.SemiBold, color = DP.Ink)
                     Box(Modifier.padding(start = 10.dp).width(1.dp).height(24.dp).background(DP.Line))
                 }
             },
-            placeholder = { Text("1XXX-XXXXXX") }, label = { Text("Mobile number") },
+            placeholder = { Text(stringResource(R.string.phone_placeholder)) }, label = { Text(stringResource(R.string.mobile_number)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            isError = state.error != null, supportingText = state.error?.let { { Text(it) } },
+            isError = state.error != null, supportingText = state.error?.let { { Text(it.asString()) } },
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DP.Primary500, focusedLabelColor = DP.Primary500),
         )
-        AccentCta(if (state.loading) "Sending code…" else "Send OTP", local.length == 10, state.loading, onSend)
+        AccentCta(stringResource(if (state.loading) R.string.sending_code else R.string.send_otp), local.length == 10, state.loading, onSend)
+        val tPre = stringResource(R.string.terms_prefix); val tDrv = stringResource(R.string.terms_driver); val tAnd = stringResource(R.string.terms_and)
+        val tPriv = stringResource(R.string.terms_privacy); val tSuf = stringResource(R.string.terms_suffix)
         Text(buildAnnotatedString {
-            append("By continuing you agree to Durpalla's ")
-            withStyle(SpanStyle(color = DP.Primary500, fontWeight = FontWeight.SemiBold)) { append("Driver Terms") }
-            append(" and ")
-            withStyle(SpanStyle(color = DP.Primary500, fontWeight = FontWeight.SemiBold)) { append("Privacy Policy") }
-            append(".")
+            append(tPre)
+            withStyle(SpanStyle(color = DP.Primary500, fontWeight = FontWeight.SemiBold)) { append(tDrv) }
+            append(tAnd)
+            withStyle(SpanStyle(color = DP.Primary500, fontWeight = FontWeight.SemiBold)) { append(tPriv) }
+            append(tSuf)
         }, fontSize = 12.sp, color = DP.Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
@@ -164,12 +173,12 @@ fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> 
 @Composable
 fun OtpBoxes(code: String, onChange: (String) -> Unit, isError: Boolean) {
     BasicTextField(
-        value = code, onValueChange = { onChange(it.filter(Char::isDigit).take(6)) },
+        value = code, onValueChange = { onChange(DigitFormatter.digitsOnly(it, 6)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), singleLine = true,
         decorationBox = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(6) { i ->
-                    val ch = code.getOrNull(i)?.toString() ?: ""
+                    val ch = code.getOrNull(i)?.toString()?.toLocalDigits() ?: ""
                     val active = i == code.length.coerceAtMost(5) && code.length < 6
                     val border = when { isError -> DP.Danger; active -> DP.Primary500; ch.isNotEmpty() -> DP.Primary200; else -> DP.Line }
                     Box(
@@ -184,7 +193,7 @@ fun OtpBoxes(code: String, onChange: (String) -> Unit, isError: Boolean) {
 }
 
 @Composable
-fun OtpScreen(phone: String, error: String?, onBack: () -> Unit, onVerify: (String) -> Unit) {
+fun OtpScreen(phone: String, error: com.durpalla.driver.i18n.UiText?, onBack: () -> Unit, onVerify: (String) -> Unit) {
     var code by remember { mutableStateOf("") }
     var seconds by remember { mutableIntStateOf(30) }
     LaunchedEffect(seconds) { if (seconds > 0) { delay(1000); seconds-- } }
@@ -192,18 +201,19 @@ fun OtpScreen(phone: String, error: String?, onBack: () -> Unit, onVerify: (Stri
     BrandedAuthLayout(onBack = onBack) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(36.dp).clip(CircleShape).background(DP.Primary100), contentAlignment = Alignment.Center) { Icon(Icons.Filled.Lock, null, tint = DP.Primary500, modifier = Modifier.size(18.dp)) }
-            Text("  Verify your number", style = MaterialTheme.typography.titleLarge, color = DP.Ink)
+            Text("  " + stringResource(R.string.otp_title), style = MaterialTheme.typography.titleLarge, color = DP.Ink)
         }
-        Text(buildAnnotatedString { append("Enter the 6-digit code sent to "); withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = DP.Ink)) { append(shown) } }, color = DP.Muted, fontSize = 13.sp)
+        val sentTo = stringResource(R.string.otp_sent_to)
+        Text(buildAnnotatedString { append(sentTo); withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = DP.Ink)) { append(shown.toLocalDigits()) } }, color = DP.Muted, fontSize = 13.sp)
         OtpBoxes(code, { code = it }, error != null)
-        if (error != null) Text(error, color = DP.Danger, fontSize = 12.sp)
-        AccentCta("Verify & continue", code.length == 6) { onVerify(code) }
+        if (error != null) Text(error.asString(), color = DP.Danger, fontSize = 12.sp)
+        AccentCta(stringResource(R.string.otp_verify), code.length == 6) { onVerify(code) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text("Didn't get it? ", color = DP.Muted, fontSize = 13.sp)
-            Text(if (seconds > 0) "Resend in 0:${seconds.toString().padStart(2, '0')}" else "Resend code", fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.otp_didnt_get), color = DP.Muted, fontSize = 13.sp)
+            Text(if (seconds > 0) str(R.string.otp_resend_in, "0:${seconds.toString().padStart(2, '0')}") else stringResource(R.string.otp_resend), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                 color = if (seconds > 0) DP.Muted else DP.Primary500, modifier = Modifier.clickable(enabled = seconds == 0) { seconds = 30 })
         }
-        Text("Wrong number? Change", color = DP.Primary500, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+        Text(stringResource(R.string.otp_wrong_number), color = DP.Primary500, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onBack))
     }
 }

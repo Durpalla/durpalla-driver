@@ -1,5 +1,8 @@
 package com.durpalla.driver.domain
 
+import com.durpalla.driver.R
+import com.durpalla.driver.i18n.UiText
+
 /** Durpalla platform commission. */
 object Commission {
     const val RATE_PERCENT = 10
@@ -45,16 +48,16 @@ class SlotLockPolicy(private val bufferMinutes: Long = 0) {
 
 sealed interface BidValidation {
     data object Ok : BidValidation
-    data class Error(val message: String) : BidValidation
+    data class Error(val message: String, val text: UiText = UiText.Raw(message)) : BidValidation
 }
 
 object BidRules {
     const val MIN_BID = 100
     fun validate(amount: Int?, request: TripRequest, confirmedTrips: List<Trip>, policy: SlotLockPolicy): BidValidation = when {
-        amount == null -> BidValidation.Error("Enter a rent amount")
-        amount < MIN_BID -> BidValidation.Error("Minimum bid is ৳$MIN_BID")
-        amount > request.suggestedMax * 3 -> BidValidation.Error("Amount is far above the suggested range")
-        policy.check(request.slot, confirmedTrips) is SlotCheck.Conflict -> BidValidation.Error("Slot booked: you already have a trip in this time")
+        amount == null -> BidValidation.Error("Enter a rent amount", UiText.res(R.string.err_rent))
+        amount < MIN_BID -> BidValidation.Error("Minimum bid is ৳$MIN_BID", UiText.res(R.string.err_min_bid, UiText.Taka(MIN_BID)))
+        amount > request.suggestedMax * 3 -> BidValidation.Error("Amount is far above the suggested range", UiText.res(R.string.err_far_above))
+        policy.check(request.slot, confirmedTrips) is SlotCheck.Conflict -> BidValidation.Error("Slot booked: you already have a trip in this time", UiText.res(R.string.err_slot_conflict))
         else -> BidValidation.Ok
     }
 }

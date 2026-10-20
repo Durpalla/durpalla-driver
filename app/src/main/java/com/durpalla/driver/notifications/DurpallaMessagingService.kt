@@ -1,5 +1,6 @@
 package com.durpalla.driver.notifications
 
+import com.durpalla.driver.i18n.UiText
 import com.durpalla.driver.data.ServiceLocator
 import com.durpalla.driver.realtime.EventParser
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -25,8 +26,8 @@ class DurpallaMessagingService : FirebaseMessagingService() {
         val event = EventParser.parseFcm(data)
         event?.let { ServiceLocator.realtime.inject(it) }
         val spec = event?.let(NotificationFactory::spec)
-            ?: message.notification?.let { NotificationSpec(data["channel"] ?: Channels.GENERAL, it.title.orEmpty(), it.body.orEmpty(), data["route"] ?: "home") }
-            ?: data["title"]?.let { NotificationSpec(data["channel"] ?: Channels.GENERAL, it, data["body"].orEmpty(), data["route"] ?: "home") }
+            ?: message.notification?.let { NotificationSpec(data["channel"] ?: Channels.GENERAL, UiText.Raw(it.title.orEmpty()), UiText.Raw(it.body.orEmpty()), data["route"] ?: "home") }
+            ?: data["title"]?.let { NotificationSpec(data["channel"] ?: Channels.GENERAL, UiText.Raw(it), UiText.Raw(data["body"].orEmpty()), data["route"] ?: "home") }
         spec?.let { Notifier.show(this, it.copy(route = data["route"] ?: it.route)) }
     }
 }

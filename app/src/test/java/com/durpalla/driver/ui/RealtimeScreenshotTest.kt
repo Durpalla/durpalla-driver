@@ -40,7 +40,7 @@ class RealtimeScreenshotTest {
         Box(Modifier.fillMaxSize()) {
             HomeScreen(SampleData.driver, true, {}, SampleData.summary, 2, SampleData.trips[0], SampleData.requests, { it.id == "r3" }, {}, {}, {}, {}, {}, ConnectionState.LIVE)
             Box(Modifier.fillMaxSize().background(DP.Ink.copy(alpha = 0.35f)))
-            LiveBannerCard(LiveBanner(LiveBanner.Kind.ACCEPTED, "Customer accepted your bid!", "Sadarghat → Narayanganj · ৳3,100 · slot locked", "won/t1"), {}, {},
+            LiveBannerCard(LiveBanner(LiveBanner.Kind.ACCEPTED, com.durpalla.driver.i18n.UiText.res(com.durpalla.driver.R.string.banner_accepted), com.durpalla.driver.i18n.UiText.res(com.durpalla.driver.R.string.banner_accepted_body, "Sadarghat", "Narayanganj", com.durpalla.driver.i18n.UiText.Taka(3100)), "won/t1"), {}, {},
                 Modifier.align(Alignment.TopCenter).padding(12.dp).padding(top = 24.dp))
         }
     }

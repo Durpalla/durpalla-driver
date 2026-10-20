@@ -8,4 +8,4 @@ import com.durpalla.driver.ui.theme.DurpallaTheme
 annotation class PhonePreview
 
 @Composable
-fun P(content: @Composable () -> Unit) = DurpallaTheme(content)
+fun P(content: @Composable () -> Unit) = DurpallaTheme(content = content)

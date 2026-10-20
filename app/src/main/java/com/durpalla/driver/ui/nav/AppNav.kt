@@ -1,5 +1,12 @@
 package com.durpalla.driver.ui.nav
 
+import androidx.compose.ui.res.stringResource
+import com.durpalla.driver.R
+import com.durpalla.driver.data.ServiceLocator
+import com.durpalla.driver.i18n.AppLanguage
+import com.durpalla.driver.i18n.AppLocale
+import com.durpalla.driver.i18n.LanguageManager
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -28,7 +35,7 @@ import com.durpalla.driver.ui.screens.*
 import com.durpalla.driver.ui.theme.DP
 
 object Routes {
-    const val SPLASH = "splash"; const val LOGIN = "login"; const val OTP = "otp"
+    const val SPLASH = "splash"; const val LANGUAGE_PROMPT = "language/first"; const val LANGUAGE = "language"; const val LOGIN = "login"; const val OTP = "otp"
     const val KYC_VEHICLE = "kyc/vehicle"; const val KYC_DOCS = "kyc/docs"; const val KYC_REVIEW = "kyc/review"
     const val HOME = "home"; const val REQUESTS = "requests"; const val MY_TRIPS = "trips"; const val EARNINGS = "earnings"; const val PROFILE = "profile"
     const val INCOMING = "request/{id}"; const val BID = "request/{id}/bid"; const val CONFLICT = "request/{id}/conflict"
@@ -42,10 +49,10 @@ object Routes {
     fun predefForm(id: String?) = "predefined/edit?id=${id ?: ""}"
 }
 
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
+private data class Tab(val route: String, @androidx.annotation.StringRes val label: Int, val icon: ImageVector)
 private val tabs = listOf(
-    Tab(Routes.HOME, "Home", Icons.Filled.Home), Tab(Routes.REQUESTS, "Requests", Icons.Filled.Inbox), Tab(Routes.MY_TRIPS, "My Trips", Icons.Filled.Schedule),
-    Tab(Routes.EARNINGS, "Earnings", Icons.Filled.Payments), Tab(Routes.PROFILE, "Profile", Icons.Filled.Person),
+    Tab(Routes.HOME, R.string.tab_home, Icons.Filled.Home), Tab(Routes.REQUESTS, R.string.tab_requests, Icons.Filled.Inbox), Tab(Routes.MY_TRIPS, R.string.tab_trips, Icons.Filled.Schedule),
+    Tab(Routes.EARNINGS, R.string.tab_earnings, Icons.Filled.Payments), Tab(Routes.PROFILE, R.string.tab_profile, Icons.Filled.Person),
 )
 
 private fun NavHostController.tab(route: String) = navigate(route) {
@@ -58,7 +65,10 @@ fun DriverApp(
     vm: DriverViewModel = viewModel(),
     deepLink: kotlinx.coroutines.flow.StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
     onDeepLinkHandled: () -> Unit = {},
+    language: LanguageManager = ServiceLocator.language,
+    onLanguageApplied: () -> Unit = {},
 ) {
+    val scope = rememberCoroutineScope()
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
@@ -85,7 +95,7 @@ fun DriverApp(
     // Notification tap -> route (only once logged in, i.e. a tab destination exists in the back stack).
     LaunchedEffect(pending, current) {
         val route = pending ?: return@LaunchedEffect
-        if (current != null && current !in setOf(Routes.SPLASH, Routes.LOGIN, Routes.OTP)) {
+        if (current != null && current !in setOf(Routes.SPLASH, Routes.LANGUAGE_PROMPT, Routes.LOGIN, Routes.OTP)) {
             if (route.startsWith("requests")) nav.tab(Routes.REQUESTS) else nav.navigate(route)
             onDeepLinkHandled()
         }
@@ -106,7 +116,7 @@ fun DriverApp(
         bottomBar = {
             if (current in tabs.map { it.route }) NavigationBar(containerColor = Color.White) {
                 tabs.forEach { t ->
-                    NavigationBarItem(selected = current == t.route, onClick = { nav.tab(t.route) }, icon = { Icon(t.icon, null) }, label = { Text(t.label) },
+                    NavigationBarItem(selected = current == t.route, onClick = { nav.tab(t.route) }, icon = { Icon(t.icon, null) }, label = { Text(stringResource(t.label), maxLines = 1) },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = DP.Primary500, selectedTextColor = DP.Primary500, indicatorColor = DP.Primary100))
                 }
             }
@@ -114,7 +124,24 @@ fun DriverApp(
     ) { outer ->
       Box(Modifier.fillMaxSize()) {
         NavHost(nav, startDestination = Routes.SPLASH, modifier = Modifier.padding(bottom = if (current in tabs.map { it.route }) outer.calculateBottomPadding() else 0.dp)) {
-            composable(Routes.SPLASH) { SplashScreen { nav.navigate(Routes.LOGIN) { popUpTo(Routes.SPLASH) { inclusive = true } } } }
+            composable(Routes.SPLASH) {
+                SplashScreen {
+                    scope.launch {
+                        val next = if (language.needsPrompt()) Routes.LANGUAGE_PROMPT else Routes.LOGIN
+                        nav.navigate(next) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                    }
+                }
+            }
+            composable(Routes.LANGUAGE_PROMPT) {
+                LanguagePromptScreen(initial = AppLanguage.fromTag(java.util.Locale.getDefault().language)?.takeIf { it == AppLanguage.BANGLA }) { lang ->
+                    // Navigate first: applying the locale may recreate the activity, which restores this back stack.
+                    nav.navigate(Routes.LOGIN) { popUpTo(Routes.LANGUAGE_PROMPT) { inclusive = true } }
+                    scope.launch { language.choose(lang); onLanguageApplied() }
+                }
+            }
+            composable(Routes.LANGUAGE) {
+                LanguageSettingsScreen(AppLocale.language, { lang -> scope.launch { language.choose(lang); onLanguageApplied() } }) { nav.popBackStack() }
+            }
             composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.navigate(Routes.OTP) } } }
             composable(Routes.OTP) { OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code -> vm.verifyOtp(code) { kyc -> nav.navigate(if (kyc) Routes.HOME else Routes.KYC_VEHICLE) } } }
             composable(Routes.KYC_VEHICLE) { KycVehicleScreen(auth.kycType, vm::setKycType, { nav.popBackStack() }) { nav.navigate(Routes.KYC_DOCS) } }
@@ -190,16 +217,15 @@ fun DriverApp(
 
             composable(Routes.PROFILE) {
                 ProfileScreen(driver, { nav.navigate(Routes.VEHICLES) }, { nav.navigate(Routes.RATINGS) }, { nav.navigate(Routes.HISTORY) }, { nav.navigate(Routes.PREDEF) },
-                    { nav.navigate(Routes.CALENDAR) }, { nav.navigate(Routes.WALLET) }, { nav.navigate(Routes.SUPPORT) }, { nav.navigate(Routes.NOTIFS) }) {
-                    nav.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
-                }
+                    { nav.navigate(Routes.CALENDAR) }, { nav.navigate(Routes.WALLET) }, { nav.navigate(Routes.SUPPORT) }, { nav.navigate(Routes.NOTIFS) },
+                    { nav.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }, onLanguage = { nav.navigate(Routes.LANGUAGE) })
             }
             composable(Routes.VEHICLES) { VehiclesScreen(driver) { nav.popBackStack() } }
             composable(Routes.NOTIFS) { NotificationsScreen(notifs) { nav.popBackStack() } }
             composable(Routes.SUPPORT) { SupportScreen { nav.popBackStack() } }
         }
         androidx.compose.animation.AnimatedVisibility(
-            visible = banner != null && current !in setOf(Routes.SPLASH, Routes.LOGIN, Routes.OTP),
+            visible = banner != null && current !in setOf(Routes.SPLASH, Routes.LANGUAGE_PROMPT, Routes.LOGIN, Routes.OTP),
             enter = androidx.compose.animation.slideInVertically { -it } + androidx.compose.animation.fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { -it } + androidx.compose.animation.fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp),

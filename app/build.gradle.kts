@@ -27,6 +27,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
+        resourceConfigurations += listOf("en", "bn")
         buildConfigField("String", "API_BASE_URL", "\"${cfg("API_BASE_URL", "https://api.durpalla.com/driver/v1/")}\"")
         buildConfigField("String", "PUSHER_KEY", "\"${cfg("PUSHER_KEY")}\"")
         buildConfigField("String", "PUSHER_CLUSTER", "\"${cfg("PUSHER_CLUSTER", "ap2")}\"")
@@ -43,11 +44,21 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time (dates, slots) on minSdk 24.
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    // Keep Bangla strings in the base APK so the in-app language switch works for Play installs too.
+    bundle { language { enableSplit = false } }
+    lint {
+        // Every user-facing string must exist in values-bn; fail the build otherwise.
+        error += listOf("MissingTranslation", "ExtraTranslation", "MissingQuantity")
+        abortOnError = true
+        checkReleaseBuilds = false
     }
     testOptions { unitTests { isIncludeAndroidResources = true } }
 }
@@ -72,6 +83,9 @@ dependencies {
     implementation(libs.pusher.java.client)
     implementation(libs.recaptcha)
     implementation(libs.gson)
+    implementation(libs.androidx.appcompat)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.androidx.datastore.preferences)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
