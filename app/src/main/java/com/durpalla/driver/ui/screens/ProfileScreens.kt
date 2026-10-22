@@ -1,5 +1,6 @@
 package com.durpalla.driver.ui.screens
 
+import com.durpalla.driver.i18n.asString
 import androidx.compose.ui.res.stringResource
 import com.durpalla.driver.R
 import com.durpalla.driver.ui.str
@@ -21,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.durpalla.driver.data.SampleData
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.components.*
 import com.durpalla.driver.ui.theme.DP
@@ -92,8 +92,8 @@ fun NotificationsScreen(list: List<AppNotification>, onBack: () -> Unit) {
         ScreenColumn(pad) {
             list.forEach { n ->
                 DCard(color = if (n.unread) DP.Primary100 else Color.White) {
-                    Row { Text(n.title.toLocalDigits(), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f)); Text(n.time.toLocalDigits(), color = DP.Muted, fontSize = 11.sp) }
-                    Text(n.body.toLocalDigits(), color = DP.Muted, fontSize = 13.sp)
+                    Row { Text(n.title.asString().toLocalDigits(), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f)); Text(n.time.toLocalDigits(), color = DP.Muted, fontSize = 11.sp) }
+                    Text(n.body.asString().toLocalDigits(), color = DP.Muted, fontSize = 13.sp)
                 }
             }
         }
@@ -126,9 +126,6 @@ fun SupportScreen(onBack: () -> Unit) {
     }
 }
 
-@PhonePreview @Composable private fun ProfilePreview() = P { ProfileScreen(SampleData.driver, {}, {}, {}, {}, {}, {}, {}, {}, {}) }
-@PhonePreview @Composable private fun VehiclesPreview() = P { VehiclesScreen(SampleData.driver) {} }
-@PhonePreview @Composable private fun NotificationsPreview() = P { NotificationsScreen(SampleData.notifications) {} }
 @PhonePreview @Composable private fun SupportPreview() = P { SupportScreen {} }
 
 @Composable

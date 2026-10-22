@@ -34,7 +34,11 @@ sealed interface UiText {
 /** Error carrying a translatable message (thrown by repositories / validation). */
 class UserFacingException(val text: UiText) : RuntimeException(text.toString())
 
-fun Throwable.toUiText(@StringRes fallback: Int): UiText = (this as? UserFacingException)?.text ?: UiText.res(fallback)
+fun Throwable.toUiText(@StringRes fallback: Int): UiText = when (this) {
+    is UserFacingException -> text
+    is com.durpalla.driver.data.api.ApiException -> com.durpalla.driver.data.api.ApiErrors.text(this) ?: UiText.res(fallback)
+    else -> UiText.res(fallback)
+}
 
 /** Server reasons are free text; empty or the English defaults map to translated strings. */
 fun reasonText(reason: String, @StringRes fallback: Int): UiText =

@@ -25,6 +25,8 @@ class DriverApplication : Application() {
         ServiceLocator.language = lang
         runBlocking { lang.restore() }
         ServiceLocator.appContext = this
+        // Restore the stored token before the first screen decides between login and home.
+        kotlinx.coroutines.runBlocking { ServiceLocator.session.restore() }
         Channels.create(this)
         com.durpalla.driver.call.CallNotifications.createChannels(this)
         ServiceLocator.botProtection = RecaptchaBotProtection.create(this, BuildConfig.RECAPTCHA_SITE_KEY)

@@ -37,12 +37,18 @@ class BackToHomeNavigationTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private lateinit var nav: TestNavHostController
     private val trip = SampleData.trips[0]
+    private val trips = com.durpalla.driver.data.FakeTripRepository()
+    private val vm by lazy {
+        com.durpalla.driver.ui.DriverViewModel(com.durpalla.driver.data.FakeAuthRepository(), com.durpalla.driver.data.FakeRequestRepository(trips, com.durpalla.driver.domain.SlotLockPolicy(30)),
+            trips, com.durpalla.driver.data.FakeEarningsRepository(), com.durpalla.driver.data.FakeProfileRepository(), com.durpalla.driver.domain.SlotLockPolicy(30),
+            com.durpalla.driver.realtime.DisabledRealtimeClient(), session = com.durpalla.driver.data.testSession())
+    }
 
     private fun launch(lang: LanguageManager = LanguageManager(InMemoryLanguageStore(AppLanguage.ENGLISH), {})) {
         rule.setContent {
             nav = TestNavHostController(LocalContext.current).apply { navigatorProvider.addNavigator(ComposeNavigator()) }
             androidx.compose.runtime.CompositionLocalProvider(LocalAnimateLive provides false) {
-                DurpallaTheme { DriverApp(language = lang, navController = nav) }
+                DurpallaTheme { DriverApp(vm = vm, language = lang, navController = nav) }
             }
         }
     }

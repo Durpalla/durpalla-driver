@@ -35,15 +35,21 @@ android {
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("en", "bn")
-        buildConfigField("String", "API_BASE_URL", "\"${cfg("API_BASE_URL", "https://api.durpalla.com/driver/v1/")}\"")
         buildConfigField("String", "PUSHER_KEY", "\"${cfg("PUSHER_KEY")}\"")
         buildConfigField("String", "PUSHER_CLUSTER", "\"${cfg("PUSHER_CLUSTER", "ap2")}\"")
-        buildConfigField("String", "PUSHER_AUTH_URL", "\"${cfg("PUSHER_AUTH_URL", "https://api.durpalla.com/driver/v1/realtime/auth")}\"")
         buildConfigField("String", "RECAPTCHA_SITE_KEY", "\"${cfg("RECAPTCHA_SITE_KEY")}\"")
     }
 
+    // Durpalla apigw driver API (/api/v1/driver/): dev for debug builds, prod for release. Override with API_HOST.
+    fun apiFields(t: com.android.build.api.dsl.ApplicationBuildType, defaultHost: String) {
+        val host = cfg("API_HOST", defaultHost).trimEnd('/')
+        t.buildConfigField("String", "API_BASE_URL", "\"$host/api/v1/driver/\"")
+        t.buildConfigField("String", "PUSHER_AUTH_URL", "\"$host/api/v1/driver/realtime/auth\"")
+    }
     buildTypes {
+        debug { apiFields(this, "https://dev-apigw.durpalla.com") }
         release {
+            apiFields(this, "https://apigw.durpalla.com")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -54,7 +60,17 @@ android {
         // java.time (dates, slots) on minSdk 24.
         isCoreLibraryDesugaringEnabled = true
     }
-    kotlinOptions { jvmTarget = "17" }
+
+    // `-Pabi=arm64-v8a` → one small per-ABI APK (the universal debug APK carries every native ABI: Agora + WebRTC).
+    splits {
+        abi {
+            val abis = (project.findProperty("abi") as String?)?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+            isEnable = abis.isNotEmpty()
+            reset()
+            include(*abis.toTypedArray())
+            isUniversalApk = false
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -71,6 +87,11 @@ android {
 }
 
 dependencies {
+    // No dependency with a known advisory: raise vulnerable transitive versions (Firestore → protobuf-javalite, Robolectric → bcprov).
+    constraints {
+        implementation(libs.protobuf.javalite) { because("GHSA-735f-pc8j-v9w8 fixed in 3.25.5+") }
+        testImplementation(libs.bouncycastle.bcprov) { because("Bouncy Castle advisories fixed in 1.85+") }
+    }
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -100,9 +121,11 @@ dependencies {
     implementation(libs.androidx.appcompat)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.okhttp)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)
@@ -111,4 +134,8 @@ dependencies {
     testImplementation(libs.androidx.navigation.testing)
     testImplementation(libs.roborazzi.compose)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+kotlin {
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }

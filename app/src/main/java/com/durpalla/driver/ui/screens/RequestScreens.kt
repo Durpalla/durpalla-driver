@@ -29,7 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.durpalla.driver.data.SampleData
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.BidFormState
 import com.durpalla.driver.realtime.ConnectionState
@@ -253,11 +252,11 @@ fun BidCard(b: Bid, onClick: () -> Unit) {
 }
 
 @Composable
-fun BidDetailSheetContent(b: Bid, onSimulateWin: () -> Unit) {
+fun BidDetailSheetContent(b: Bid, onWithdraw: () -> Unit) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         RouteText(b.request.from, b.request.to)
         KeyValue(stringResource(R.string.your_bid), taka(b.amount), bold = true); KeyValue(stringResource(R.string.status), b.status.title())
-        if (b.status == BidStatus.PENDING) SecondaryButton(stringResource(R.string.demo_choose_me), onSimulateWin)
+        if (b.status == BidStatus.PENDING) SecondaryButton(stringResource(R.string.withdraw_bid), onWithdraw)
     }
 }
 
@@ -295,19 +294,5 @@ fun SlotConflictScreen(request: TripRequest, conflict: Trip?, onBack: () -> Unit
     }
 }
 
-@PhonePreview @Composable private fun HomePreview() = P {
-    HomeScreen(SampleData.driver, true, {}, SampleData.summary, 5, SampleData.trips[0], SampleData.requests, { it.id == "r3" }, {}, {}, {}, {}, {})
-}
-@PhonePreview @Composable private fun IncomingPreview() = P { IncomingRequestScreen(SampleData.requests[0], null, {}, {}, {}, {}) }
-@PhonePreview @Composable private fun PlaceBidPreview() = P {
-    PlaceBidScreen(SampleData.requests[0], BidFormState(amount = "3200"), {}, {}, {}, {}, {}, LiveBid("r1", 5, 3000, "b1", 3200, BidStatus.PENDING), ConnectionState.LIVE)
-}
-@PhonePreview @Composable private fun RequestsPreview() = P { RequestsScreen(SampleData.requests, emptyList(), { false }, 0, {}, {}, {}) }
-@PhonePreview @Composable private fun MyBidsPreview() = P {
-    val r = SampleData.requests
-    RequestsScreen(r, BidStatus.entries.mapIndexed { i, s -> Bid("b$i", r[i].id, r[i], 3000 + i * 100, "", s) }, { false }, 1, {}, {}, {})
-}
-@PhonePreview @Composable private fun BidWonPreview() = P { BidWonScreen(SampleData.trips[0], {}, {}) }
-@PhonePreview @Composable private fun ConflictPreview() = P { SlotConflictScreen(SampleData.requests[2], SampleData.trips[0], {}, {}) }
 
 private fun greetingRes(h: Int = java.time.LocalTime.now().hour) = when (h) { in 4..11 -> R.string.greeting_morning; in 12..16 -> R.string.greeting_afternoon; else -> R.string.greeting_evening }

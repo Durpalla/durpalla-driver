@@ -12,7 +12,7 @@ sealed interface CallState {
 
 enum class EndReason(val wire: String) { HANGUP("hangup"), REMOTE_HANGUP("remote_hangup"), DECLINED("declined"), MISSED("missed"), FAILED("failed"), BUSY("busy") }
 
-/** Pure transitions + the 30 s missed timeout, shared by Fake and WebRTC providers (and unit-tested). */
+/** Pure transitions + the 30 s missed timeout, shared by the call providers (and unit-tested). */
 object CallMachine {
     const val RING_TIMEOUT_MS = 30_000L
 
