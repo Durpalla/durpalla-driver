@@ -97,6 +97,7 @@ fun DriverApp(
     val auth by vm.authState.collectAsStateWithLifecycle()
     val bidForm by vm.bidForm.collectAsStateWithLifecycle()
     val wd by vm.withdraw.collectAsStateWithLifecycle()
+    val accounts by vm.accounts.collectAsStateWithLifecycle()
     val recon by vm.reconciliation.collectAsStateWithLifecycle()
     val connection by vm.connection.collectAsStateWithLifecycle()
     val live by vm.liveBids.collectAsStateWithLifecycle()
@@ -114,6 +115,8 @@ fun DriverApp(
     // Android 13+ notification permission, asked once the driver reaches Home.
     val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    // 401 from the API: token is already cleared, go back to login.
+    LaunchedEffect(Unit) { vm.sessionExpired.collect { nav.navigateToLogin() } }
     LaunchedEffect(current == Routes.HOME) {
         if (current == Routes.HOME && android.os.Build.VERSION.SDK_INT >= 33 && !com.durpalla.driver.notifications.Notifier.canPost(ctx))
             permLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -138,8 +141,11 @@ fun DriverApp(
             composable(Routes.SPLASH) {
                 SplashScreen {
                     scope.launch {
-                        val next = if (language.needsPrompt()) Routes.LANGUAGE_PROMPT else Routes.LOGIN
-                        nav.go(next) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                        when {
+                            language.needsPrompt() -> nav.go(Routes.LANGUAGE_PROMPT) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                            vm.loggedIn.value -> nav.navigateToHome()
+                            else -> nav.go(Routes.LOGIN) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                        }
                     }
                 }
             }
@@ -156,7 +162,17 @@ fun DriverApp(
             composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.go(Routes.OTP) } } }
             composable(Routes.OTP) { OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code -> vm.verifyOtp(code) { kyc -> if (kyc) nav.navigateToHome() else nav.go(Routes.KYC_VEHICLE) } } }
             composable(Routes.KYC_VEHICLE) { KycVehicleScreen(auth.kycType, vm::setKycType, { nav.popBackStack() }) { nav.go(Routes.KYC_DOCS) } }
-            composable(Routes.KYC_DOCS) { KycDocumentsScreen(auth.uploaded, vm::toggleDoc, { nav.popBackStack() }) { vm.submitKyc { nav.go(Routes.KYC_REVIEW) } } }
+            composable(Routes.KYC_DOCS) {
+                // Tap a document → system photo picker; the URI is uploaded (multipart) on submit.
+                var picking by remember { mutableStateOf<String?>(null) }
+                val picker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+                    picking?.let { d -> if (uri != null) vm.setDocFile(d, uri.toString()) }; picking = null
+                }
+                KycDocumentsScreen(auth.uploaded, { d ->
+                    if (d in auth.uploaded) vm.setDocFile(d, null)
+                    else { picking = d; picker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                }, { nav.popBackStack() }) { vm.submitKyc { nav.go(Routes.KYC_REVIEW) } }
+            }
             composable(Routes.KYC_REVIEW) { KycReviewScreen { nav.navigateToHome() } }
 
           // Logged-in area. Home is the start destination: every "Back to home" pops to it.
@@ -224,7 +240,7 @@ fun DriverApp(
             }
             composable(Routes.WITHDRAW) {
                 LaunchedEffect(wd.done) { if (wd.done != null) nav.go(Routes.WITHDRAW_OK) { popUpTo(Routes.WITHDRAW) { inclusive = true } } }
-                WithdrawScreen(summary.walletBalance, vm.accounts, wd, vm::setWdAccount, vm::setWdAmount, vm::setPin, vm::confirmWithdraw) { nav.popBackStack() }
+                WithdrawScreen(summary.walletBalance, accounts, wd, vm::setWdAccount, vm::setWdAmount, vm::setPin, vm::confirmWithdraw, { nav.popBackStack() }, vm::addPayoutAccount)
             }
             composable(Routes.WITHDRAW_OK) {
                 val done = wd.done
@@ -237,10 +253,13 @@ fun DriverApp(
             composable(Routes.PROFILE) {
                 ProfileScreen(driver, { nav.go(Routes.VEHICLES) }, { nav.go(Routes.RATINGS) }, { nav.go(Routes.HISTORY) }, { nav.go(Routes.PREDEF) },
                     { nav.go(Routes.CALENDAR) }, { nav.go(Routes.WALLET) }, { nav.go(Routes.SUPPORT) }, { nav.go(Routes.NOTIFS) },
-                    { nav.navigateToLogin() }, onLanguage = { nav.go(Routes.LANGUAGE) })
+                    { vm.logout { nav.navigateToLogin() } }, onLanguage = { nav.go(Routes.LANGUAGE) })
             }
             composable(Routes.VEHICLES) { VehiclesScreen(driver) { nav.popBackStack() } }
-            composable(Routes.NOTIFS) { NotificationsScreen(notifs) { nav.popBackStack() } }
+            composable(Routes.NOTIFS) {
+                LaunchedEffect(Unit) { vm.openNotifications() }
+                NotificationsScreen(notifs) { nav.popBackStack() }
+            }
             composable(Routes.SUPPORT) { SupportScreen { nav.popBackStack() } }
           }
         }
@@ -269,7 +288,7 @@ fun DriverApp(
         ModalBottomSheet(onDismissRequest = { bidSheet = null }, containerColor = Color.White) {
             BidDetailSheetContent(b) {
                 bidSheet = null
-                vm.simulateWin(b.id) { trip -> nav.go(Routes.won(trip.id)) }
+                vm.withdrawBid(b.id)
             }
         }
     }

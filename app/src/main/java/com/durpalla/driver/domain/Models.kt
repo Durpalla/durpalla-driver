@@ -66,6 +66,7 @@ data class Trip(
     val fromPredefined: Boolean = false,
     /** trip.callLog from the API (see docs/calling-contract.md). */
     val callLog: List<com.durpalla.driver.call.CallLogEntry> = emptyList(),
+    val commission: Int = 0,
 )
 
 data class PredefinedTrip(
@@ -95,12 +96,23 @@ data class Driver(
     val area: String,
     val vehicles: List<Vehicle>,
     val documents: List<DocumentItem>,
-)
+    val id: String = "",
+    val kycComplete: Boolean = false,
+    val canBid: Boolean = false,
+    val online: Boolean = true,
+    val walletBalance: Int = 0,
+    val hasWithdrawPin: Boolean = false,
+) {
+    companion object {
+        /** Before GET me has loaded (not sample data: every field is blank). */
+        val Empty = Driver("", "", 0.0, 0, "", emptyList(), emptyList())
+    }
+}
 
 enum class TxType { EARNING, COMMISSION, WITHDRAWAL, ADJUSTMENT }
 data class WalletTx(val id: String, val title: String, val date: LocalDate, val amount: Int, val type: TxType)
 
-data class WithdrawAccount(val method: PaymentMethod, val account: String)
+data class WithdrawAccount(val method: PaymentMethod, val account: String, val id: String = "")
 
 data class EarningsSummary(
     val walletBalance: Int,
@@ -113,7 +125,9 @@ data class EarningsSummary(
     val weekChangePct: Int,
     val weekTrips: Int,
     val weekCommission: Int,
-)
+) {
+    companion object { val Empty = EarningsSummary(0, 0, "", 0, 0, emptyList(), 0, 0, 0, 0) }
+}
 
 data class TripLine(val date: String, val code: String, val method: PaymentMethod, val gross: Int, val commission: Int)
 
@@ -134,4 +148,5 @@ data class Reconciliation(
     val commissionDueOnCash: Int get() = Commission.of(cashCollected)
 }
 
-data class AppNotification(val title: String, val body: String, val time: String, val unread: Boolean)
+/** Feed item from GET notifications; text is built on device from the event (localised). */
+data class AppNotification(val title: com.durpalla.driver.i18n.UiText, val body: com.durpalla.driver.i18n.UiText, val time: String, val unread: Boolean, val id: String = "", val route: String? = null)

@@ -30,7 +30,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.durpalla.driver.data.SampleData
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.components.*
 import com.durpalla.driver.ui.theme.DP
@@ -291,12 +290,3 @@ fun TripHistoryScreen(trips: List<Trip>, onBack: () -> Unit, onTrip: (Trip) -> U
     }
 }
 
-@PhonePreview @Composable private fun MyTripsPreview() = P { MyTripsScreen(SampleData.trips, SampleData.predefined, {}, {}, {}, {}, {}) }
-@PhonePreview @Composable private fun PredefListPreview() = P { PredefinedListScreen(SampleData.predefined, {}, {}, {}) }
-@PhonePreview @Composable private fun PredefFormPreview() = P { PredefinedFormScreen(SampleData.predefined[0], {}, {}) }
-@PhonePreview @Composable private fun AvailabilityPreview() = P { AvailabilityScreen(SampleData.trips, setOf(LocalDate.now().plusDays(3)), {}, {}) }
-@PhonePreview @Composable private fun TripDetailPreview() = P { TripDetailScreen(SampleData.trips[0], {}, {}) }
-@PhonePreview @Composable private fun LivePreview() = P { LiveTripScreen(SampleData.trips[0].copy(status = TripStatus.IN_PROGRESS), {}, onCollect = {}) }
-@PhonePreview @Composable private fun CollectPreview() = P { CollectPaymentScreen(SampleData.trips[0], {}, {}) }
-@PhonePreview @Composable private fun CompletedPreview() = P { TripCompletedScreen(SampleData.trips[1]) {} }
-@PhonePreview @Composable private fun HistoryPreview() = P { TripHistoryScreen(SampleData.trips, {}, {}) }

@@ -20,8 +20,6 @@ interface RealtimeClient {
     fun watchTrip(tripId: String)
     fun unwatchTrip(tripId: String)
     fun disconnect()
-    /** Hook so the fake can simulate the customer's reaction to the driver's own bid. No-op for Pusher. */
-    fun onOwnBidPlaced(bid: Bid) {}
     /** Lets FCM-delivered events join the same stream (app in foreground). */
     fun inject(event: RealtimeEvent)
 }
@@ -40,9 +38,10 @@ class PusherRealtimeClient(private val key: String, private val cluster: String,
     }
 
     override fun connect(driverId: String, authToken: () -> String?) {
-        if (pusher != null) return
+        if (pusher != null) disconnect()
         tokenProvider = authToken
-        val authorizer = HttpChannelAuthorizer(authUrl).apply { setHeaders(mapOf("Authorization" to "Bearer ${authToken().orEmpty()}")) }
+        // Sanctum bearer for POST {API}/realtime/auth (socket_id, channel_name); the token is never logged.
+        val authorizer = HttpChannelAuthorizer(authUrl).apply { setHeaders(mapOf("Authorization" to "Bearer ${authToken().orEmpty()}", "Accept" to "application/json")) }
         val p = Pusher(key, PusherOptions().setCluster(cluster).setUseTLS(true).setChannelAuthorizer(authorizer))
         p.connect(object : ConnectionEventListener {
             override fun onConnectionStateChange(change: ConnectionStateChange) {
@@ -64,54 +63,13 @@ class PusherRealtimeClient(private val key: String, private val cluster: String,
     override fun inject(event: RealtimeEvent) { _events.tryEmit(event) }
 }
 
-/**
- * Default client: simulates the backend so the app feels live without credentials.
- * Competitor bids arrive every few seconds, a new request after ~20s, and ~8s after the driver bids the
- * customer accepts it (or rejects when the driver isn't the lowest).
- */
-class FakeRealtimeClient(private val scope: CoroutineScope, private val openRequests: () -> List<TripRequest>, private val speed: Long = 1) : RealtimeClient {
-    private val _conn = MutableStateFlow(ConnectionState.OFFLINE); override val connection: StateFlow<ConnectionState> = _conn
+/** Used when PUSHER_KEY isn't configured: no live channel (lists still load from the API; FCM events are injected). */
+class DisabledRealtimeClient : RealtimeClient {
+    override val connection: StateFlow<ConnectionState> = MutableStateFlow(ConnectionState.OFFLINE)
     private val _events = MutableSharedFlow<RealtimeEvent>(extraBufferCapacity = 64); override val events: SharedFlow<RealtimeEvent> = _events
-    private var job: Job? = null
-    private val counts = mutableMapOf<String, Int>(); private val lowest = mutableMapOf<String, Int>()
-
-    override fun connect(driverId: String, authToken: () -> String?) {
-        if (job != null) return
-        job = scope.launch {
-            _conn.value = ConnectionState.CONNECTING; delay(800 / speed); _conn.value = ConnectionState.LIVE
-            var tick = 0
-            while (isActive) {
-                delay(6000 / speed); tick++
-                openRequests().randomOrNull()?.let { r ->
-                    val n = (counts[r.id] ?: r.bidsCount) + 1; counts[r.id] = n
-                    val bid = (r.suggestedMin..r.suggestedMax).random() / 50 * 50
-                    val low = minOf(lowest[r.id] ?: bid, bid); lowest[r.id] = low
-                    _events.emit(RealtimeEvent.BidPlaced(r.id, n, low))
-                }
-                if (tick == 3) _events.emit(RealtimeEvent.TripRequested(sampleRequest()))
-                if (tick % 10 == 7) { _conn.value = ConnectionState.RECONNECTING; delay(1500 / speed); _conn.value = ConnectionState.LIVE }
-            }
-        }
-    }
-
-    override fun onOwnBidPlaced(bid: Bid) {
-        scope.launch {
-            delay(8000 / speed)
-            val low = lowest[bid.requestId]
-            if (low == null || bid.amount <= low + 200) {
-                _events.emit(RealtimeEvent.BidAccepted(bid.id, bid.requestId, "t-live-${bid.requestId}", "DP-${(25900..25999).random()}", bid.amount / 4))
-            } else _events.emit(RealtimeEvent.BidRejected(bid.id, bid.requestId, ""))
-        }
-    }
-
-    private fun sampleRequest(): TripRequest {
-        val start = LocalDateTime.now().plusHours(3).withMinute(0).withSecond(0).withNano(0)
-        return TripRequest("r-live-${System.currentTimeMillis() % 10000}", VehicleType.SPEEDBOAT, "Sadarghat", "Narayanganj", TimeSlot(start, start.plusMinutes(90)),
-            6, Customer("Farhana Akter", 4.9, 12), 2600, 3300, 0, 120, "Live request (simulated)", 18.5)
-    }
-
+    override fun connect(driverId: String, authToken: () -> String?) {}
     override fun watchTrip(tripId: String) {}
     override fun unwatchTrip(tripId: String) {}
-    override fun disconnect() { job?.cancel(); job = null; _conn.value = ConnectionState.OFFLINE }
+    override fun disconnect() {}
     override fun inject(event: RealtimeEvent) { _events.tryEmit(event) }
 }

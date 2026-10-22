@@ -13,3 +13,4 @@ build/
 
 # Firebase config (per environment)
 app/google-services.json
+.kotlin/

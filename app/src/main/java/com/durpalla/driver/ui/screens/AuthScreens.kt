@@ -89,7 +89,8 @@ fun KycVehicleScreen(selected: VehicleType, onSelect: (VehicleType) -> Unit, onB
 }
 
 /** API document keys (ASCII) with their translated labels. */
-val kycDocs = listOf("nid" to R.string.doc_nid, "licence" to R.string.doc_licence, "registration" to R.string.doc_reg, "fitness" to R.string.doc_fitness, "selfie" to R.string.doc_selfie)
+/** Keys are the apigw KYC document types. */
+val kycDocs = listOf("nid_front" to R.string.doc_nid_front, "nid_back" to R.string.doc_nid_back, "license" to R.string.doc_licence, "vehicle_reg" to R.string.doc_reg, "vehicle_photo" to R.string.doc_vehicle_photo, "selfie" to R.string.doc_selfie)
 
 @Composable
 fun KycDocumentsScreen(uploaded: Set<String>, onToggle: (String) -> Unit, onBack: () -> Unit, onSubmit: () -> Unit) {

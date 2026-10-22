@@ -37,9 +37,9 @@ object EventParser {
     fun parse(name: String, json: String): RealtimeEvent? = runCatching {
         val o = JsonParser.parseString(json).asJsonObject
         when (name) {
-            EventNames.TRIP_REQUESTED -> RealtimeEvent.TripRequested(request(o.obj("request")))
-            EventNames.BID_PLACED -> RealtimeEvent.BidPlaced(o.str("requestId"), o.int("bidCount"), o.int("lowestBid"))
-            EventNames.BID_UPDATED -> RealtimeEvent.BidUpdated(o.str("bidId"), o.str("requestId"), o.int("amount"), o.int("bidCount"), o.int("lowestBid"))
+            EventNames.TRIP_REQUESTED -> RealtimeEvent.TripRequested(com.durpalla.driver.data.api.ApiMappers.request(o.obj("request")))
+            EventNames.BID_PLACED -> RealtimeEvent.BidPlaced(o.str("requestId"), o.int("bidCount"), o.intOr("lowestBid", 0))
+            EventNames.BID_UPDATED -> RealtimeEvent.BidUpdated(o.str("bidId"), o.str("requestId"), o.int("amount"), o.int("bidCount"), o.intOr("lowestBid", 0))
             EventNames.BID_ACCEPTED -> RealtimeEvent.BidAccepted(o.str("bidId"), o.str("requestId"), o.str("tripId"), o.str("tripCode"), o.intOr("advancePaid", 0))
             EventNames.BID_REJECTED -> RealtimeEvent.BidRejected(o.str("bidId"), o.str("requestId"), o.strOr("reason", "Customer chose another driver"))
             EventNames.TRIP_CANCELLED -> RealtimeEvent.TripCancelled(o.str("tripId"), o.strOr("reason", "Cancelled by customer"))
@@ -53,20 +53,10 @@ object EventParser {
     /** FCM data messages carry `event` + `payload` (JSON string). */
     fun parseFcm(data: Map<String, String>): RealtimeEvent? = data["event"]?.let { e -> data["payload"]?.let { parse(e, it) } }
 
-    private fun request(o: JsonObject): TripRequest {
-        val c = o.obj("customer")
-        return TripRequest(
-            id = o.str("id"), vehicleType = VehicleType.valueOf(o.str("vehicleType").uppercase()), from = o.str("from"), to = o.str("to"),
-            slot = TimeSlot(time(o.str("start")), time(o.str("end"))), passengers = o.int("passengers"),
-            customer = Customer(c.str("name"), c.get("rating")?.asDouble ?: 0.0, c.intOr("trips", 0)),
-            suggestedMin = o.int("suggestedMin"), suggestedMax = o.int("suggestedMax"), bidsCount = o.intOr("bidsCount", 0),
-            expiresInSec = o.intOr("expiresInSec", 120), note = o.strOr("note", ""), distanceKm = o.get("distanceKm")?.asDouble ?: 0.0,
-        )
-    }
-    private fun time(s: String): LocalDateTime = LocalDateTime.parse(s.removeSuffix("Z").substringBefore("+"))
+    private fun time(s: String): LocalDateTime = com.durpalla.driver.data.api.ApiMappers.time(s) ?: error("bad time $s")
     private fun JsonObject.obj(k: String) = getAsJsonObject(k) ?: error("missing $k")
     private fun JsonObject.str(k: String): String = get(k)?.takeUnless { it.isJsonNull }?.asString ?: error("missing $k")
     private fun JsonObject.strOr(k: String, d: String) = get(k)?.takeUnless { it.isJsonNull }?.asString ?: d
-    private fun JsonObject.int(k: String): Int = get(k)?.asInt ?: error("missing $k")
+    private fun JsonObject.int(k: String): Int = get(k)?.takeUnless { it.isJsonNull }?.asInt ?: error("missing $k")
     private fun JsonObject.intOr(k: String, d: Int) = get(k)?.takeUnless { it.isJsonNull }?.asInt ?: d
 }

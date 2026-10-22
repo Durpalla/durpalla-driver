@@ -62,7 +62,7 @@ class BanglaInputTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         AppLocale.language = AppLanguage.BANGLA
         Locale.setDefault(Locale.forLanguageTag("bn-BD"))
-        vm = DriverViewModel(auth, requests, trips, earnings, FakeProfileRepository(), SlotLockPolicy(30), SilentRealtime)
+        vm = DriverViewModel(auth, requests, trips, earnings, FakeProfileRepository(), SlotLockPolicy(30), SilentRealtime, session = testSession())
     }
     @After fun tearDown() { Dispatchers.resetMain(); AppLocale.language = AppLanguage.ENGLISH; Locale.setDefault(Locale.US) }
 

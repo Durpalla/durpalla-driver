@@ -17,6 +17,7 @@ private fun at(dayOffset: Long, h: Int, m: Int = 0): LocalDateTime =
 
 private fun slot(day: Long, h1: Int, h2: Int, m1: Int = 0, m2: Int = 0) = TimeSlot(at(day, h1, m1), at(day, h2, m2))
 
+/** In-memory test doubles + fixtures (test sources only; the app uses the Api* repositories). */
 object SampleData {
     val customers = listOf(
         Customer("Tanvir Ahmed", 4.7, 23), Customer("Nusrat Jahan", 4.9, 41),
@@ -86,10 +87,10 @@ object SampleData {
     )
 
     val notifications = listOf(
-        AppNotification("New trip request", "Speedboat · Sadarghat → Narayanganj · 8 pax", "2 min ago", true),
-        AppNotification("You won a bid!", "Nusrat Jahan chose your ৳3,200 bid. Slot locked.", "1 h ago", true),
-        AppNotification("Payout sent", "৳10,000 sent to bKash 017•••567", "Yesterday", false),
-        AppNotification("Document expiring", "Vessel registration expires in 14 days", "2 days ago", false),
+        AppNotification(UiText.Raw("New trip request"), UiText.Raw("Speedboat · Sadarghat → Narayanganj · 8 pax"), "2 min ago", true),
+        AppNotification(UiText.Raw("You won a bid!"), UiText.Raw("Nusrat Jahan chose your ৳3,200 bid. Slot locked."), "1 h ago", true),
+        AppNotification(UiText.Raw("Payout sent"), UiText.Raw("৳10,000 sent to bKash 017•••567"), "Yesterday", false),
+        AppNotification(UiText.Raw("Document expiring"), UiText.Raw("Vessel registration expires in 14 days"), "2 days ago", false),
     )
 }
 
@@ -101,7 +102,8 @@ class FakeAuthRepository : AuthRepository {
         delay(400)
         return if (code.length == 6) Result.success(false) else Result.failure(UserFacingException(UiText.res(R.string.err_otp)))
     }
-    override suspend fun submitKyc(type: VehicleType, docs: List<String>) = run { delay(400); Result.success(Unit) }
+    override suspend fun submitKyc(type: VehicleType, files: Map<String, String>) = run { delay(400); Result.success(Unit) }
+    override suspend fun logout() = Result.success(Unit)
 }
 
 class FakeTripRepository : TripRepository {
@@ -112,17 +114,21 @@ class FakeTripRepository : TripRepository {
     private val _blocked = MutableStateFlow(setOf(LocalDate.now().plusDays(5), LocalDate.now().plusDays(6)))
     override val blockedDays: StateFlow<Set<LocalDate>> = _blocked
 
-    override suspend fun addTrip(trip: Trip) = _trips.update { listOf(trip) + it }
-    override suspend fun updateStatus(tripId: String, status: TripStatus, method: PaymentMethod?) =
-        _trips.update { l -> l.map { if (it.id == tripId) it.copy(status = status, paymentMethod = method ?: it.paymentMethod) else it } }
-    override suspend fun savePredefined(trip: PredefinedTrip) = _pre.update { l ->
+    fun addTrip(trip: Trip) = _trips.update { listOf(trip) + it }
+    override suspend fun refresh() = Result.success(Unit)
+    override suspend fun refreshTrip(tripId: String) = _trips.value.firstOrNull { it.id == tripId }?.let { Result.success(it) } ?: Result.failure(NoSuchElementException(tripId))
+    override fun clear() {}
+    override suspend fun updateStatus(tripId: String, status: TripStatus, method: PaymentMethod?) = Result.success(
+        _trips.update { l -> l.map { if (it.id == tripId) it.copy(status = status, paymentMethod = method ?: it.paymentMethod) else it } })
+    override suspend fun savePredefined(trip: PredefinedTrip) = Result.success(_pre.update { l ->
         if (l.any { it.id == trip.id }) l.map { if (it.id == trip.id) trip else it } else l + trip
-    }
-    override suspend fun toggleBlocked(day: LocalDate) = _blocked.update { if (day in it) it - day else it + day }
+    })
+    override suspend fun deletePredefined(id: String) = Result.success(_pre.update { l -> l.filterNot { it.id == id } })
+    override suspend fun toggleBlocked(day: LocalDate) = Result.success(_blocked.update { if (day in it) it - day else it + day })
 }
 
 class FakeRequestRepository(
-    private val tripRepo: TripRepository,
+    private val tripRepo: FakeTripRepository,
     private val policy: SlotLockPolicy,
 ) : RequestRepository {
     private val _requests = MutableStateFlow(SampleData.requests)
@@ -154,8 +160,9 @@ class FakeRequestRepository(
 
     override suspend fun skip(requestId: String) = _requests.update { l -> l.filterNot { it.id == requestId } }
 
-    override suspend fun simulateWin(bidId: String): Result<Trip> =
-        accepted(bidId, "t${System.nanoTime()}", "DP-${25900 + (0..99).random()}", -1)
+    override suspend fun refresh() = Result.success(Unit)
+    override fun clear() {}
+    override suspend fun withdrawBid(bidId: String) = Result.success(_bids.update { l -> l.filterNot { it.id == bidId } })
 
     override suspend fun accepted(bidId: String, tripId: String, tripCode: String, advancePaid: Int): Result<Trip> {
         val bid = _bids.value.firstOrNull { it.id == bidId } ?: return Result.failure(NoSuchElementException("Unknown bid $bidId"))
@@ -181,13 +188,16 @@ class FakeEarningsRepository : EarningsRepository {
     override val summary: StateFlow<EarningsSummary> = _summary
     private val _tx = MutableStateFlow(SampleData.transactions)
     override val transactions: StateFlow<List<WalletTx>> = _tx
-    override val accounts = listOf(
+    override suspend fun refresh() = Result.success(Unit)
+    override fun clear() {}
+    override suspend fun addAccount(method: PaymentMethod, account: String) = Result.success(WithdrawAccount(method, account, "a${System.nanoTime()}").also { a -> accounts.update { listOf(a) + it } })
+    override val accounts = MutableStateFlow(listOf(
         WithdrawAccount(PaymentMethod.BKASH, "017•••567"),
         WithdrawAccount(PaymentMethod.NAGAD, "018•••921"),
         WithdrawAccount(PaymentMethod.BANK, "DBBL ••••4410"),
-    )
+    ))
 
-    override suspend fun reconciliation(period: String) = Reconciliation(
+    override suspend fun reconciliation(period: String) = Result.success(Reconciliation(
         period = period, completedTrips = 42, gross = 96400, commission = 9640, paidOut = 62000, withdrawals = 4,
         cashCollected = 0,
         lines = listOf(
@@ -196,7 +206,7 @@ class FakeEarningsRepository : EarningsRepository {
             TripLine("21 Oct", "Fixed · 9 seats", PaymentMethod.NAGAD, 3150, 315),
             TripLine("19 Oct", "DP-25702", PaymentMethod.CASH, 9000, 900),
         ),
-    ).let { it.copy(cashCollected = 6120) }
+    ).let { it.copy(cashCollected = 6120) })
 
     override suspend fun withdraw(account: WithdrawAccount, amount: Int, pin: String): Result<WalletTx> {
         delay(600)
@@ -219,46 +229,15 @@ class FakeProfileRepository : ProfileRepository {
     override val driver: StateFlow<Driver> = MutableStateFlow(SampleData.driver)
     override val ratings: StateFlow<List<Rating>> = MutableStateFlow(SampleData.ratings)
     override val notifications: StateFlow<List<AppNotification>> = MutableStateFlow(SampleData.notifications)
+    override suspend fun refresh() = Result.success(Unit)
+    override suspend fun setOnline(online: Boolean) = Result.success((driver as MutableStateFlow).update { it.copy(online = online) })
+    override suspend fun refreshNotifications() = Result.success(Unit)
+    override suspend fun markNotificationsRead() = Result.success((notifications as MutableStateFlow).update { l -> l.map { it.copy(unread = false) } })
+    override fun clear() {}
 }
 
-/** Manual DI. Replace with Hilt/Koin if preferred. */
-object ServiceLocator {
-    val slotPolicy = SlotLockPolicy(bufferMinutes = 30)
-    val auth: AuthRepository by lazy { FakeAuthRepository() }
-    val trips: TripRepository by lazy { FakeTripRepository() }
-    val requests: RequestRepository by lazy { FakeRequestRepository(trips, slotPolicy) }
-    val earnings: EarningsRepository by lazy { FakeEarningsRepository() }
-    val profile: ProfileRepository by lazy { FakeProfileRepository() }
-    private val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
-
-    /** Pusher when PUSHER_KEY is configured, otherwise the simulator. */
-    val realtime: com.durpalla.driver.realtime.RealtimeClient by lazy {
-        if (com.durpalla.driver.BuildConfig.PUSHER_KEY.isNotBlank())
-            com.durpalla.driver.realtime.PusherRealtimeClient(com.durpalla.driver.BuildConfig.PUSHER_KEY, com.durpalla.driver.BuildConfig.PUSHER_CLUSTER, com.durpalla.driver.BuildConfig.PUSHER_AUTH_URL)
-        else com.durpalla.driver.realtime.FakeRealtimeClient(appScope, { requests.requests.value.filter { it.status == RequestStatus.OPEN || it.status == RequestStatus.BIDDING } })
+/** Logged-in session for ViewModel tests. */
+fun testSession(scope: kotlinx.coroutines.CoroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)) =
+    com.durpalla.driver.data.session.SessionStore(com.durpalla.driver.data.session.InMemoryTokenStore(), scope).also {
+        kotlinx.coroutines.runBlocking { it.login(com.durpalla.driver.data.session.Session("test-token", "1")) }
     }
-    /** Set in DriverApplication. */
-    lateinit var appContext: android.content.Context
-    /** Bearer token for the Durpalla API (set by the real auth repository after OTP login). */
-    @Volatile var authToken: () -> String? = { null }
-    /** Firebase custom token (uid = Durpalla userId) for Firestore signaling; GET /auth/firebase-token. */
-    @Volatile var firebaseToken: suspend () -> String? = { null }
-    var firebaseConfigured = false
-    val callApi: com.durpalla.driver.call.CallApi by lazy { com.durpalla.driver.call.HttpCallApi(com.durpalla.driver.BuildConfig.API_BASE_URL, { authToken() }) }
-    /** Server picks agora|webrtc per call (router) when Firebase is configured, otherwise the offline simulator. */
-    val calls: com.durpalla.driver.call.CallProvider by lazy {
-        if (firebaseConfigured) {
-            val signaling = com.durpalla.driver.call.FirestoreSignaling(customToken = { firebaseToken() })
-            com.durpalla.driver.call.CallProviderRouter(appScope, callApi, mapOf(
-                com.durpalla.driver.call.CallProviderKind.AGORA to com.durpalla.driver.call.AgoraCallProvider(appContext, appScope, callApi, signaling),
-                com.durpalla.driver.call.CallProviderKind.WEBRTC to com.durpalla.driver.call.WebRtcCallProvider(appContext, appScope, callApi, signaling),
-            ))
-        } else com.durpalla.driver.call.FakeCallProvider(appScope)
-    }
-    /** Set when the user tapped Accept on the incoming-call notification. */
-    val acceptFromNotification = kotlinx.coroutines.flow.MutableStateFlow(false)
-    var botProtection: com.durpalla.driver.security.BotProtection = com.durpalla.driver.security.NoopBotProtection
-    /** Replaced with the DataStore + AppCompat implementation in DriverApplication. */
-    var language: com.durpalla.driver.i18n.LanguageManager =
-        com.durpalla.driver.i18n.LanguageManager(com.durpalla.driver.i18n.InMemoryLanguageStore(), { })
-}

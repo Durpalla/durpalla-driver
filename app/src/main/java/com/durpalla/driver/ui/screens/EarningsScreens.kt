@@ -34,7 +34,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.durpalla.driver.data.SampleData
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.WithdrawState
 import com.durpalla.driver.ui.components.*
@@ -43,6 +42,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun BarChart(data: List<Pair<String, Int>>, modifier: Modifier = Modifier) {
+    if (data.isEmpty()) return
     val max = (data.maxOfOrNull { it.second } ?: 1).coerceAtLeast(1)
     Column(modifier) {
         Canvas(Modifier.fillMaxWidth().height(140.dp)) {
@@ -95,8 +95,11 @@ fun EarningsScreen(s: EarningsSummary, onWithdraw: () -> Unit, onWallet: () -> U
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawState, onAccount: (WithdrawAccount) -> Unit, onAmount: (String) -> Unit, onPin: (String) -> Unit, onConfirm: () -> Unit, onBack: () -> Unit) {
+fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawState, onAccount: (WithdrawAccount) -> Unit, onAmount: (String) -> Unit, onPin: (String) -> Unit, onConfirm: () -> Unit, onBack: () -> Unit, onAddAccount: (PaymentMethod, String) -> Unit = { _, _ -> }) {
     var showPin by remember { mutableStateOf(false) }
+    var adding by remember(accounts.isEmpty()) { mutableStateOf(accounts.isEmpty()) }
+    var newMethod by remember { mutableStateOf(PaymentMethod.BKASH) }
+    var newAccount by remember { mutableStateOf("") }
     val amt = DigitFormatter.parseInt(st.amount) ?: 0
     Scaffold(topBar = { DTopBar(stringResource(R.string.withdraw), onBack) }, bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.cont), { showPin = true }, enabled = amt in 500..balance, accent = true) } }) { pad ->
         ScreenColumn(pad) {
@@ -113,6 +116,19 @@ fun WithdrawScreen(balance: Int, accounts: List<WithdrawAccount>, st: WithdrawSt
                     }
                 }
             }
+            if (adding) {
+                DCard {
+                    Text(stringResource(R.string.add_payout_account), style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(PaymentMethod.BKASH, PaymentMethod.NAGAD, PaymentMethod.BANK).forEach { m ->
+                            DurpallaButton(m.title(), { newMethod = m }, variant = if (m == newMethod) ButtonVariant.Primary else ButtonVariant.Secondary, size = ButtonSize.Small, fillWidth = false)
+                        }
+                    }
+                    OutlinedTextField(newAccount.toLocalDigits(), { newAccount = DigitFormatter.toAsciiDigits(it) }, label = { Text(stringResource(R.string.account_number)) }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = if (newMethod == PaymentMethod.BANK) KeyboardType.Text else KeyboardType.Phone), shape = RoundedCornerShape(14.dp))
+                    DurpallaButton(stringResource(R.string.payout_save), { onAddAccount(newMethod, newAccount); adding = false; newAccount = "" }, enabled = newAccount.length >= 6 && !st.loading)
+                }
+            } else DurpallaButton(stringResource(R.string.add_payout_account), { adding = true }, variant = ButtonVariant.Secondary, size = ButtonSize.Small, fillWidth = false)
             OutlinedTextField(st.amount.toLocalDigits(), onAmount, label = { Text(stringResource(R.string.amount)) }, prefix = { Text(stringResource(R.string.taka_prefix)) }, modifier = Modifier.fillMaxWidth(), singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), supportingText = { Text(str(R.string.withdraw_hint, num(500), num(10))) }, shape = RoundedCornerShape(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(1000, 5000, balance).forEach { v -> DurpallaButton(if (v == balance) stringResource(R.string.all) else taka(v), { onAmount(v.toString()) }, variant = ButtonVariant.Secondary, size = ButtonSize.Small, fillWidth = false) } }
@@ -231,14 +247,10 @@ fun RatingsScreen(avg: Double, ratings: List<Rating>, onBack: () -> Unit) {
     }
 }
 
-@PhonePreview @Composable private fun EarningsPreview() = P { EarningsScreen(SampleData.summary, {}, {}, {}, {}, 4.8) }
 @PhonePreview @Composable private fun WithdrawPreview() = P {
     val a = listOf(WithdrawAccount(PaymentMethod.BKASH, "017•••567"), WithdrawAccount(PaymentMethod.NAGAD, "018•••921"))
     WithdrawScreen(18640, a, WithdrawState(account = a[0], amount = "5000"), {}, {}, {}, {}, {})
 }
-@PhonePreview @Composable private fun WithdrawSuccessPreview() = P { WithdrawSuccessScreen(SampleData.transactions[2], WithdrawAccount(PaymentMethod.BKASH, "017•••567")) {} }
 @PhonePreview @Composable private fun ReconPreview() = P {
     ReconciliationScreen(Reconciliation("October 2026", 42, 96400, 9640, 62000, 4, 6120, listOf(TripLine("23 Oct", "DP-25814", PaymentMethod.CASH, 3200, 320))), {}, {})
 }
-@PhonePreview @Composable private fun WalletPreview() = P { WalletScreen(18640, SampleData.transactions, {}, {}) }
-@PhonePreview @Composable private fun RatingsPreview() = P { RatingsScreen(4.8, SampleData.ratings, {}) }
