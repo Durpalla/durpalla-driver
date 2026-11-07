@@ -1,5 +1,6 @@
 # Active context
 
+- 2026-11-07: Debug install via `scripts/run_debug.sh` + `.env` (`API_HOST`, Pusher, reCAPTCHA) → syncs `local.properties` then `installDebug` on paired device.
 - 2026-10-20: Added Cursor token-saving rules, ignores and this memory bank.
 - Next: wire real API client (currently mock/fake data).
 

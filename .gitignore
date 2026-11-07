@@ -11,6 +11,11 @@ build/
 *.aab
 *.keystore
 
+# Local env (use .env.example)
+.env
+.env.*
+!.env.example
+
 # Firebase config (per environment)
 app/google-services.json
 .kotlin/
