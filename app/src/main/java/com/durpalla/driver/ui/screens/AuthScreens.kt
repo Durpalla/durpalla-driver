@@ -93,18 +93,57 @@ fun KycVehicleScreen(selected: VehicleType, onSelect: (VehicleType) -> Unit, onB
 val kycDocs = listOf("nid_front" to R.string.doc_nid_front, "nid_back" to R.string.doc_nid_back, "license" to R.string.doc_licence, "vehicle_reg" to R.string.doc_reg, "vehicle_photo" to R.string.doc_vehicle_photo, "selfie" to R.string.doc_selfie)
 
 @Composable
-fun KycDocumentsScreen(uploaded: Set<String>, onToggle: (String) -> Unit, onBack: () -> Unit, onSubmit: () -> Unit) {
-    Scaffold(topBar = { DTopBar(stringResource(R.string.kyc_docs_title), onBack) }, bottomBar = { StickyCta { PrimaryButton(stringResource(R.string.kyc_submit), onSubmit, enabled = uploaded.size >= 3) } }) { pad ->
+fun KycDocumentsScreen(
+    uploaded: Set<String>,
+    uploading: Set<String> = emptySet(),
+    error: com.durpalla.driver.i18n.UiText? = null,
+    loading: Boolean = false,
+    onPick: (String) -> Unit,
+    onBack: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Scaffold(
+        topBar = { DTopBar(stringResource(R.string.kyc_docs_title), onBack) },
+        bottomBar = {
+            StickyCta {
+                PrimaryButton(
+                    stringResource(R.string.kyc_submit),
+                    onSubmit,
+                    enabled = uploaded.size >= 3 && uploading.isEmpty() && !loading,
+                    loading = loading,
+                )
+            }
+        },
+    ) { pad ->
         ScreenColumn(pad) {
             KycStepper(1)
             Text(stringResource(R.string.kyc_docs_sub), color = DP.Muted)
+            if (error != null) Text(error.asString(), color = DP.Danger, fontSize = 13.sp)
             kycDocs.forEach { (d, label) ->
                 val done = d in uploaded
-                DCard(onClick = { onToggle(d) }) {
+                val busy = d in uploading
+                DCard(onClick = { if (!busy && !loading) onPick(d) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (done) Icons.Filled.CheckCircle else Icons.Filled.UploadFile, null, tint = if (done) DP.Success else DP.Primary500)
+                        when {
+                            busy -> CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = DP.Primary500)
+                            done -> Icon(Icons.Filled.CheckCircle, null, tint = DP.Success)
+                            else -> Icon(Icons.Filled.UploadFile, null, tint = DP.Primary500)
+                        }
                         Text(stringResource(label), Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.titleSmall)
-                        StatusChip(stringResource(if (done) R.string.uploaded else R.string.upload), if (done) Tone.SUCCESS else Tone.PRIMARY)
+                        StatusChip(
+                            stringResource(
+                                when {
+                                    busy -> R.string.uploading
+                                    done -> R.string.uploaded
+                                    else -> R.string.upload
+                                },
+                            ),
+                            when {
+                                busy -> Tone.WARNING
+                                done -> Tone.SUCCESS
+                                else -> Tone.PRIMARY
+                            },
+                        )
                     }
                 }
             }
@@ -135,5 +174,7 @@ fun KycReviewScreen(onContinue: () -> Unit) {
 @PhonePreview @Composable private fun LoginPreview() = P { PhoneLoginScreen(AuthState(phone = "01711234567"), {}, {}) }
 @PhonePreview @Composable private fun OtpPreview() = P { OtpScreen("01711234567", null, {}, {}) }
 @PhonePreview @Composable private fun KycVehiclePreview() = P { KycVehicleScreen(VehicleType.SPEEDBOAT, {}, {}, {}) }
-@PhonePreview @Composable private fun KycDocsPreview() = P { KycDocumentsScreen(setOf(kycDocs[0].first), {}, {}, {}) }
+@PhonePreview @Composable private fun KycDocsPreview() = P {
+    KycDocumentsScreen(setOf(kycDocs[0].first), onPick = {}, onBack = {}, onSubmit = {})
+}
 @PhonePreview @Composable private fun KycReviewPreview() = P { KycReviewScreen {} }

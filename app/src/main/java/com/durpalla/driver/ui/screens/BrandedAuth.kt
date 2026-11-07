@@ -24,7 +24,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.LocalTaxi
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +47,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -136,9 +141,9 @@ private fun Motif(icon: ImageVector, label: String) = Row(
 private fun AccentCta(text: String, enabled: Boolean, loading: Boolean = false, onClick: () -> Unit) =
     DurpallaButton(text, onClick, variant = ButtonVariant.Accent, enabled = enabled, loading = loading)
 
-/** Phone login. The VM keeps the 11-digit local number (01XXXXXXXXX); the field shows +880 and the 10 digits after 0. */
+/** Phone entry. Continue → auth/check (OTP for first time, password for returning). */
 @Composable
-fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> Unit) {
+fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onContinue: () -> Unit) {
     val local = state.phone.removePrefix("0")
     BrandedAuthLayout {
         Text(stringResource(R.string.login_title), style = MaterialTheme.typography.titleLarge, color = DP.Ink)
@@ -157,7 +162,12 @@ fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> 
             isError = state.error != null, supportingText = state.error?.let { { Text(it.asString()) } },
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DP.Primary500, focusedLabelColor = DP.Primary500),
         )
-        AccentCta(stringResource(if (state.loading) R.string.sending_code else R.string.send_otp), local.length == 10, state.loading, onSend)
+        AccentCta(
+            stringResource(if (state.loading) R.string.sending_code else R.string.continue_label),
+            local.length == 10,
+            state.loading,
+            onContinue,
+        )
         val tPre = stringResource(R.string.terms_prefix); val tDrv = stringResource(R.string.terms_driver); val tAnd = stringResource(R.string.terms_and)
         val tPriv = stringResource(R.string.terms_privacy); val tSuf = stringResource(R.string.terms_suffix)
         Text(buildAnnotatedString {
@@ -167,6 +177,70 @@ fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> 
             withStyle(SpanStyle(color = DP.Primary500, fontWeight = FontWeight.SemiBold)) { append(tPriv) }
             append(tSuf)
         }, fontSize = 12.sp, color = DP.Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** Returning driver: phone already known, enter password (OTP fallback). */
+@Composable
+fun PasswordLoginScreen(
+    state: AuthState,
+    onBack: () -> Unit,
+    onLogin: (String) -> Unit,
+    onUseOtp: () -> Unit,
+    biometricAvailable: Boolean = false,
+    onBiometricLogin: (() -> Unit)? = null,
+) {
+    var password by remember { mutableStateOf("") }
+    var show by remember { mutableStateOf(false) }
+    BrandedAuthLayout(onBack = onBack) {
+        Text(stringResource(R.string.password_login_title), style = MaterialTheme.typography.titleLarge, color = DP.Ink)
+        Text(stringResource(R.string.password_login_sub), color = DP.Muted, fontSize = 13.sp)
+        if (biometricAvailable && onBiometricLogin != null) {
+            OutlinedButton(
+                onClick = onBiometricLogin,
+                enabled = !state.loading,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Icon(Icons.Filled.Fingerprint, contentDescription = null, tint = DP.Primary500)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.biometric_login), color = DP.Primary500, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                stringResource(R.string.biometric_or_password),
+                color = DP.Muted,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it.take(20) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            label = { Text(stringResource(R.string.password_label)) },
+            visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton({ show = !show }) {
+                    Icon(if (show) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, null)
+                }
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            isError = state.error != null,
+            supportingText = state.error?.let { { Text(it.asString()) } },
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DP.Primary500, focusedLabelColor = DP.Primary500),
+        )
+        AccentCta(stringResource(R.string.log_in), password.length >= 8 && !state.loading, state.loading) { onLogin(password) }
+        Text(
+            stringResource(R.string.use_otp_instead),
+            color = DP.Primary500,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !state.loading, onClick = onUseOtp),
+        )
     }
 }
 

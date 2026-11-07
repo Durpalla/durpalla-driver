@@ -46,12 +46,33 @@ android {
         t.buildConfigField("String", "API_BASE_URL", "\"$host/api/v1/driver/\"")
         t.buildConfigField("String", "PUSHER_AUTH_URL", "\"$host/api/v1/driver/realtime/auth\"")
     }
+
+    // Release signing: STORE_FILE / STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD from local.properties or .env (via run_release.sh).
+    val releaseStorePath = cfg("STORE_FILE")
+    val releaseStoreFile = when {
+        releaseStorePath.isBlank() -> null
+        else -> rootProject.file(releaseStorePath).takeIf { it.isFile }
+            ?: file(releaseStorePath).takeIf { it.isFile }
+    }
+    signingConfigs {
+        create("release") {
+            if (releaseStoreFile != null) {
+                storeFile = releaseStoreFile
+                storePassword = cfg("STORE_PASSWORD")
+                keyAlias = cfg("KEY_ALIAS", "durpalla-driver")
+                keyPassword = cfg("KEY_PASSWORD").ifBlank { cfg("STORE_PASSWORD") }
+            }
+        }
+    }
     buildTypes {
         debug { apiFields(this, "https://dev-apigw.durpalla.com") }
         release {
             apiFields(this, "https://apigw.durpalla.com")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseStoreFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
@@ -123,6 +144,16 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.okhttp)
+    // Profile selfie: front camera only + on-device face presence (no gallery).
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.concurrent.futures)
+    implementation(libs.guava.android)
+    implementation(libs.mlkit.face.detection)
+    // Fingerprint / biometric login (EncryptedSharedPreferences + BiometricPrompt).
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.security.crypto)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

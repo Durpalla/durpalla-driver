@@ -31,16 +31,44 @@ class ApiAuthRepository(
 ) : AuthRepository {
     @Volatile private var fcmToken: String? = null
 
+    override suspend fun checkPhone(phone: String, captchaToken: String?): Result<AuthStep> =
+        api.post("auth/check", mapOf("phone" to phone, "recaptchaToken" to captchaToken)).mapCatching { d ->
+            when (d.asJsonObject.s("step").lowercase()) {
+                "login" -> AuthStep.LOGIN
+                else -> AuthStep.OTP
+            }
+        }
+
     override suspend fun requestOtp(phone: String, captchaToken: String?) =
         api.post("auth/otp", mapOf("phone" to phone, "recaptchaToken" to captchaToken)).map { }
 
-    override suspend fun verifyOtp(phone: String, code: String): Result<Boolean> =
+    override suspend fun verifyOtp(phone: String, code: String): Result<AuthGate> =
         api.post("auth/otp/verify", mapOf("phone" to phone, "code" to code, "deviceName" to deviceName)).mapCatching { d ->
-            val o = d.asJsonObject
-            session.login(Session(o.s("token"), o.o("driver")?.s("id").orEmpty()))
-            fcmToken?.let { registerDeviceToken(it) }
-            o.get("kycComplete")?.asBoolean ?: false
+            acceptSession(d.asJsonObject)
         }
+
+    override suspend fun loginWithPassword(phone: String, password: String): Result<AuthGate> =
+        api.post("auth/login", mapOf("phone" to phone, "password" to password, "deviceName" to deviceName)).mapCatching { d ->
+            acceptSession(d.asJsonObject)
+        }
+
+    override suspend fun setPassword(password: String): Result<Unit> =
+        api.post("auth/password", mapOf("password" to password, "password_confirmation" to password)).map { }
+
+    private suspend fun acceptSession(o: com.google.gson.JsonObject): AuthGate {
+        session.login(Session(o.s("token"), o.o("driver")?.s("id").orEmpty()))
+        fcmToken?.let { registerDeviceToken(it) }
+        val driverJson = o.o("driver")
+        val needsPassword = o.get("needsPassword")?.asBoolean
+            ?: driverJson?.get("hasPassword")?.asBoolean?.not()
+            ?: false
+        val needsName = driverJson?.s("name").orEmpty().trim().length < 2
+        return AuthGate(
+            needsPassword = needsPassword,
+            needsName = needsName,
+            kycComplete = o.get("kycComplete")?.asBoolean ?: false,
+        )
+    }
 
     /** Remembered so it is (re)sent right after login. */
     override suspend fun registerDeviceToken(token: String): Result<Unit> {
@@ -49,12 +77,24 @@ class ApiAuthRepository(
         return api.post("devices", mapOf("fcmToken" to token, "platform" to "android")).map { }
     }
 
-    /** POST kyc multipart: vehicleType + documents[type] = image file. */
+    /** POST kyc/documents/{type} — file lands on server for admin verification. */
+    override suspend fun uploadKycDocument(docType: String, uri: String): Result<Unit> = runCatching {
+        val (bytes, mime) = readFile(uri) ?: throw UserFacingException(UiText.res(R.string.err_kyc_docs))
+        if (bytes.isEmpty()) throw UserFacingException(UiText.res(R.string.err_kyc_docs))
+        val body = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM)
+            .addFormDataPart("file", "$docType.jpg", bytes.toRequestBody(mime.toMediaTypeOrNull()))
+            .build()
+        api.post("kyc/documents/$docType", body).getOrThrow()
+        Unit
+    }
+
+    /** POST kyc: vehicleType + optional leftover multipart files; uses already-uploaded docs. */
     override suspend fun submitKyc(type: VehicleType, files: Map<String, String>): Result<Unit> = runCatching {
         val body = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM).addFormDataPart("vehicleType", type.name)
         files.forEach { (docType, uri) ->
-            val (bytes, mime) = readFile(uri) ?: throw UserFacingException(UiText.res(R.string.err_kyc_docs))
-            body.addFormDataPart("documents[$docType]", "$docType.${if (mime.endsWith("png")) "png" else "jpg"}", bytes.toRequestBody(mime.toMediaTypeOrNull()))
+            val (bytes, mime) = readFile(uri) ?: return@forEach
+            if (bytes.isEmpty()) return@forEach
+            body.addFormDataPart("documents[$docType]", "$docType.jpg", bytes.toRequestBody(mime.toMediaTypeOrNull()))
         }
         api.post("kyc", body.build()).getOrThrow()
         Unit

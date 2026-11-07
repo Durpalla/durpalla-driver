@@ -1,5 +1,10 @@
 # Active context
 
+- 2026-11-07: Create trip — two departure modes: fixed `departure` (HH:MM) or `openAnyTime` (skip time); API + migration `open_any_time` on `driver_predefined_trips`.
+- 2026-11-07: Fingerprint login — skippable after set-password register (`BiometricSetupScreen`); Profile toggle; password screen unlock via BiometricPrompt + EncryptedSharedPreferences.
+- 2026-11-07: Profile photo = front-camera selfie only (no gallery) + ML Kit live face presence before capture; crop 100×100 then `POST me/avatar`.
+- 2026-11-07: KYC docs upload to server on pick (`POST kyc/documents/{type}`); submit finalizes; admin **Drivers / KYC** reviews approve/reject.
+- 2026-11-07: Auth like customer — `POST auth/check` → OTP (first) or password login; after OTP `needsPassword` → `SetPasswordScreen` (`POST auth/password`); later `POST auth/login`.
 - 2026-11-07: Driver display name + 100×100 avatar — blank OTP name gates `DisplayNameScreen` (`PATCH me`); Profile Change photo crops JPEG via `AvatarCrop` → `POST me/avatar`; `displayName` falls back to phone.
 - 2026-11-07: First-register `driver.welcome` notification (feed + FCM title/body; localized in Notifications list).
 - 2026-11-07: KYC view/re-upload (GET `kyc/documents/{type}`), rejected status mapping; request feed refresh after service-area save; home shows RFQs while offline.

@@ -10,6 +10,8 @@ build/
 *.apk
 *.aab
 *.keystore
+*.jks
+/keystore/
 
 # Local env (use .env.example)
 .env

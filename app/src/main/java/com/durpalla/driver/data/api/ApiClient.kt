@@ -40,7 +40,10 @@ class AuthInterceptor(private val token: () -> String?, private val onUnauthoriz
  */
 class ApiClient(baseUrl: String, token: () -> String?, onUnauthorized: () -> Unit, http: OkHttpClient? = null) {
     private val base = baseUrl.trimEnd('/') + "/"
-    val http: OkHttpClient = (http?.newBuilder() ?: OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS))
+    val http: OkHttpClient = (http?.newBuilder() ?: OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .writeTimeout(90, TimeUnit.SECONDS))
         .addInterceptor(AuthInterceptor(token, onUnauthorized)).build()
     private val json = "application/json; charset=utf-8".toMediaType()
     private val gson = Gson()

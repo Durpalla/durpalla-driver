@@ -8,15 +8,32 @@ import kotlinx.coroutines.flow.StateFlow
  * Tests provide their own in-memory doubles.
  */
 
+/** Post-login gates: set password (first OTP), display name, then KYC/home. */
+data class AuthGate(
+    val needsPassword: Boolean = false,
+    val needsName: Boolean = false,
+    val kycComplete: Boolean = false,
+)
+
+enum class AuthStep { OTP, LOGIN }
+
 interface AuthRepository {
+    /** Existing password → LOGIN; otherwise sends OTP → OTP (customer parity). */
+    suspend fun checkPhone(phone: String, captchaToken: String?): Result<AuthStep>
     /** [captchaToken] = reCAPTCHA Enterprise token for action LOGIN (null when bot protection is off). */
     suspend fun requestOtp(phone: String, captchaToken: String?): Result<Unit>
     /** FCM registration token -> backend (POST devices), so it can push to this device. */
     suspend fun registerDeviceToken(token: String): Result<Unit>
-    /** Stores the session on success. true = KYC complete. */
-    suspend fun verifyOtp(phone: String, code: String): Result<Boolean>
-    /** [files] = API document type (nid_front, license, ...) → content:// URI of the picked photo. Sent as multipart. */
-    suspend fun submitKyc(type: VehicleType, files: Map<String, String>): Result<Unit>
+    /** Stores the session on success. */
+    suspend fun verifyOtp(phone: String, code: String): Result<AuthGate>
+    /** Password login for returning drivers. */
+    suspend fun loginWithPassword(phone: String, password: String): Result<AuthGate>
+    /** After first OTP (authenticated). */
+    suspend fun setPassword(password: String): Result<Unit>
+    /** Upload one KYC photo immediately (multipart). */
+    suspend fun uploadKycDocument(docType: String, uri: String): Result<Unit>
+    /** Finalize KYC after documents are on the server. [files] optional extra multipart photos. */
+    suspend fun submitKyc(type: VehicleType, files: Map<String, String> = emptyMap()): Result<Unit>
     suspend fun logout(): Result<Unit>
 }
 

@@ -28,6 +28,7 @@ import com.durpalla.driver.i18n.DigitFormatter
 import com.durpalla.driver.i18n.asString
 import com.durpalla.driver.i18n.l
 import com.durpalla.driver.i18n.toLocalDigits
+import com.durpalla.driver.security.promptBiometric
 import com.durpalla.driver.ui.components.*
 import com.durpalla.driver.ui.plural
 import com.durpalla.driver.ui.str
@@ -52,6 +53,85 @@ fun ProfileScreen(
     onEditName: () -> Unit = {},
     onChangePhoto: () -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val activity = context as? androidx.fragment.app.FragmentActivity
+    val biometric = ServiceLocator.biometricLogin
+    val canBiometric = remember { biometric.canAuthenticate() }
+    var biometricOn by remember { mutableStateOf(biometric.isEnabled()) }
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var enablePassword by remember { mutableStateOf("") }
+    var enableError by remember { mutableStateOf<String?>(null) }
+    var enabling by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val promptTitle = stringResource(R.string.biometric_prompt_enable_title)
+    val promptSub = stringResource(R.string.biometric_prompt_enable_sub)
+    val cancelLabel = stringResource(R.string.cancel)
+    val unavailable = stringResource(R.string.biometric_unavailable)
+
+    if (showPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!enabling) showPasswordDialog = false },
+            title = { Text(stringResource(R.string.biometric_enable)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.biometric_confirm_password), color = DP.Muted, fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = enablePassword,
+                        onValueChange = { enablePassword = it.take(20); enableError = null },
+                        label = { Text(stringResource(R.string.password_label)) },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        isError = enableError != null,
+                        supportingText = enableError?.let { { Text(it) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = enablePassword.length >= 8 && !enabling,
+                    onClick = {
+                        if (activity == null || !canBiometric) {
+                            enableError = unavailable
+                            return@TextButton
+                        }
+                        enabling = true
+                        activity.promptBiometric(
+                            title = promptTitle,
+                            subtitle = promptSub,
+                            negativeButton = cancelLabel,
+                            onSuccess = {
+                                scope.launch {
+                                    ServiceLocator.auth.loginWithPassword(d.phone, enablePassword)
+                                        .onSuccess {
+                                            biometric.enable(d.phone, enablePassword)
+                                            biometricOn = true
+                                            showPasswordDialog = false
+                                            enablePassword = ""
+                                        }
+                                        .onFailure {
+                                            enableError = context.getString(R.string.err_password)
+                                        }
+                                    enabling = false
+                                }
+                            },
+                            onError = {
+                                enableError = it
+                                enabling = false
+                            },
+                        )
+                    },
+                ) { Text(if (enabling) stringResource(R.string.saving) else stringResource(R.string.biometric_enable)) }
+            },
+            dismissButton = {
+                TextButton(enabled = !enabling, onClick = { showPasswordDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     Scaffold(topBar = { DTopBar(stringResource(R.string.profile)) }) { pad ->
         ScreenColumn(pad) {
             DCard {
@@ -77,6 +157,33 @@ fun ProfileScreen(
                 MenuRow(Icons.Filled.Star, stringResource(R.string.ratings), str(R.string.rating_star, num(d.rating)), onClick = onRatings)
             }
             DCard {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Icon(Icons.Filled.Fingerprint, contentDescription = null, tint = DP.Primary500)
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text(stringResource(R.string.biometric_profile_title), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            if (canBiometric) stringResource(R.string.biometric_profile_sub)
+                            else stringResource(R.string.biometric_unavailable),
+                            color = DP.Muted,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Switch(
+                        checked = biometricOn,
+                        enabled = canBiometric,
+                        onCheckedChange = { on ->
+                            if (on) {
+                                enablePassword = ""
+                                enableError = null
+                                showPasswordDialog = true
+                            } else {
+                                biometric.disable()
+                                biometricOn = false
+                            }
+                        },
+                        colors = brandSwitchColors(),
+                    )
+                }
                 MenuRow(Icons.Filled.AccountBalanceWallet, stringResource(R.string.wallet_payout), onClick = onWallet)
                 MenuRow(Icons.Filled.Notifications, stringResource(R.string.notifications), onClick = onNotifications)
                 MenuRow(Icons.Filled.Translate, stringResource(R.string.language), stringResource(R.string.language_sub), trailing = currentLanguageName(), onClick = onLanguage)

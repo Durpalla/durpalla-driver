@@ -95,13 +95,19 @@ object SampleData {
 }
 
 class FakeAuthRepository : AuthRepository {
+    override suspend fun checkPhone(phone: String, captchaToken: String?) = run { delay(400); Result.success(AuthStep.OTP) }
     override suspend fun requestOtp(phone: String, captchaToken: String?) = run { delay(400); Result.success(Unit) }
     var lastDeviceToken: String? = null; private set
     override suspend fun registerDeviceToken(token: String) = run { lastDeviceToken = token; Result.success(Unit) }
-    override suspend fun verifyOtp(phone: String, code: String): Result<Boolean> {
+    override suspend fun verifyOtp(phone: String, code: String): Result<AuthGate> {
         delay(400)
-        return if (code.length == 6) Result.success(false) else Result.failure(UserFacingException(UiText.res(R.string.err_otp)))
+        return if (code.length == 6) Result.success(AuthGate(needsPassword = true, kycComplete = false))
+        else Result.failure(UserFacingException(UiText.res(R.string.err_otp)))
     }
+    override suspend fun loginWithPassword(phone: String, password: String) =
+        Result.success(AuthGate(kycComplete = false))
+    override suspend fun setPassword(password: String) = Result.success(Unit)
+    override suspend fun uploadKycDocument(docType: String, uri: String) = run { delay(200); Result.success(Unit) }
     override suspend fun submitKyc(type: VehicleType, files: Map<String, String>) = run { delay(400); Result.success(Unit) }
     override suspend fun logout() = Result.success(Unit)
 }

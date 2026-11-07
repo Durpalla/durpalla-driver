@@ -83,7 +83,16 @@ fun PredefinedList(list: List<PredefinedTrip>, onClick: (PredefinedTrip) -> Unit
                 VehicleBadge(p.vehicleType, 40.dp)
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     RouteText(p.from, p.to, MaterialTheme.typography.titleSmall)
-                    Text(str(R.string.dot_join3, p.departure, weekDays.filter { it.first in p.days }.map { stringResource(it.second) }.joinToString(), plural(R.plurals.seats_count, p.seats)), color = DP.Muted, fontSize = 12.sp)
+                    Text(
+                        str(
+                            R.string.dot_join3,
+                            if (p.openAnyTime) stringResource(R.string.open_any_time) else p.departure,
+                            weekDays.filter { it.first in p.days }.map { stringResource(it.second) }.joinToString(),
+                            plural(R.plurals.seats_count, p.seats),
+                        ),
+                        color = DP.Muted,
+                        fontSize = 12.sp,
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(taka(p.rent), fontWeight = FontWeight.Bold, color = DP.Primary500)
@@ -110,15 +119,36 @@ fun PredefinedFormScreen(initial: PredefinedTrip?, onBack: () -> Unit, onSave: (
     var type by remember { mutableStateOf(initial?.vehicleType ?: VehicleType.SPEEDBOAT) }
     var from by remember { mutableStateOf(initial?.from ?: "") }
     var to by remember { mutableStateOf(initial?.to ?: "") }
-    var time by remember { mutableStateOf(initial?.departure ?: "8:00 AM") }
+    var openAnyTime by remember { mutableStateOf(initial?.openAnyTime ?: false) }
+    var time by remember { mutableStateOf(initial?.departure?.takeIf { it.isNotBlank() } ?: "08:00") }
     var days by remember { mutableStateOf(initial?.days ?: setOf("Fri")) }
     var seats by remember { mutableStateOf(initial?.seats?.toString() ?: "10") }
     var rent by remember { mutableStateOf(initial?.rent?.toString() ?: "") }
     var active by remember { mutableStateOf(initial?.active ?: true) }
-    val valid = from.isNotBlank() && to.isNotBlank() && DigitFormatter.parseInt(rent) != null && days.isNotEmpty()
+    val timeOk = openAnyTime || time.trim().isNotBlank()
+    val valid = from.isNotBlank() && to.isNotBlank() && DigitFormatter.parseInt(rent) != null && days.isNotEmpty() && timeOk
     Scaffold(topBar = { DTopBar(stringResource(if (initial == null) R.string.create_trip else R.string.edit_trip), onBack) }, bottomBar = {
         StickyCta {
-            PrimaryButton(stringResource(R.string.save_trip), { onSave(PredefinedTrip(initial?.id ?: "p${System.nanoTime()}", type, from, to, DigitFormatter.toAsciiDigits(time), days, DigitFormatter.parseInt(seats) ?: 1, DigitFormatter.parseInt(rent) ?: 0, active)) }, enabled = valid)
+            PrimaryButton(
+                stringResource(R.string.save_trip),
+                {
+                    onSave(
+                        PredefinedTrip(
+                            initial?.id ?: "p${System.nanoTime()}",
+                            type,
+                            from,
+                            to,
+                            if (openAnyTime) "" else DigitFormatter.toAsciiDigits(time),
+                            days,
+                            DigitFormatter.parseInt(seats) ?: 1,
+                            DigitFormatter.parseInt(rent) ?: 0,
+                            active,
+                            openAnyTime = openAnyTime,
+                        ),
+                    )
+                },
+                enabled = valid,
+            )
         }
     }) { pad ->
         ScreenColumn(pad) {
@@ -128,7 +158,21 @@ fun PredefinedFormScreen(initial: PredefinedTrip?, onBack: () -> Unit, onSave: (
             }
             OutlinedTextField(from, { from = it }, label = { Text(stringResource(R.string.from_label)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(to, { to = it }, label = { Text(stringResource(R.string.to_label)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(time.toLocalDigits(), { time = DigitFormatter.toAsciiDigits(it) }, label = { Text(stringResource(R.string.departure_time)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Text(stringResource(R.string.departure_option), style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(!openAnyTime, { openAnyTime = false }, { Text(stringResource(R.string.departure_time)) }, colors = brandChipColors())
+                FilterChip(openAnyTime, { openAnyTime = true }, { Text(stringResource(R.string.open_any_time)) }, colors = brandChipColors())
+            }
+            if (!openAnyTime) {
+                OutlinedTextField(
+                    time.toLocalDigits(),
+                    { time = DigitFormatter.toAsciiDigits(it) },
+                    label = { Text(stringResource(R.string.departure_time_hint)) },
+                    placeholder = { Text("08:00") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
             Text(stringResource(R.string.runs_on), style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 weekDays.forEach { (d, res) -> FilterChip(d in days, { days = if (d in days) days - d else days + d }, { Text(stringResource(res)) }, colors = brandChipColors()) }

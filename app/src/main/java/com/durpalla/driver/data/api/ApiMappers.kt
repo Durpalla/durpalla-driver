@@ -116,6 +116,7 @@ object ApiMappers {
             kycStatus = kycStatus, kycNote = kyc?.s("note").orEmpty(),
             canBid = me.opt("canBid")?.asBoolean ?: false, online = me.opt("online")?.asBoolean ?: true,
             walletBalance = me.i("walletBalance"), hasWithdrawPin = me.opt("hasWithdrawPin")?.asBoolean ?: false,
+            hasPassword = me.opt("hasPassword")?.asBoolean ?: true,
             serviceStoppageCount = me.i("serviceStoppageCount"),
             avatarUrl = avatar,
         )
@@ -132,16 +133,45 @@ object ApiMappers {
         Rating(o.s("customerName"), o.i("stars"), o.s("comment"), date(o.s("createdAt")), o.s("tripCode", "#" + o.s("tripId")))
 
     fun predefined(o: JsonObject): PredefinedTrip = PredefinedTrip(
-        id = o.s("id"), vehicleType = vehicleType(o.s("vehicleType")), from = o.s("from"), to = o.s("to"), departure = o.s("departure"),
+        id = o.s("id"), vehicleType = vehicleType(o.s("vehicleType")), from = o.s("from"), to = o.s("to"),
+        departure = o.s("departure"),
         days = o.opt("days")?.takeIf { it.isJsonArray }?.asJsonArray?.map { it.asString }?.toSet().orEmpty(),
         seats = o.i("seats"), rent = o.i("rent"), active = o.opt("active")?.asBoolean ?: true,
+        openAnyTime = o.opt("openAnyTime")?.asBoolean ?: false,
     )
 
-    /** PredefinedTrip → request body (days upper-case SAT..FRI, departure HH:MM, ASCII numbers). */
-    fun predefinedBody(p: PredefinedTrip): Map<String, Any> = mapOf(
-        "vehicleType" to p.vehicleType.name, "from" to p.from, "to" to p.to, "departure" to p.departure,
-        "days" to p.days.map { it.uppercase().take(3) }, "seats" to p.seats, "rent" to p.rent, "active" to p.active,
-    )
+    /** PredefinedTrip → request body (days upper-case SAT..FRI, departure HH:MM unless openAnyTime). */
+    fun predefinedBody(p: PredefinedTrip): Map<String, Any> = buildMap {
+        put("vehicleType", p.vehicleType.name)
+        put("from", p.from)
+        put("to", p.to)
+        put("openAnyTime", p.openAnyTime)
+        if (!p.openAnyTime) put("departure", normalizeDeparture(p.departure))
+        put("days", p.days.map { it.uppercase().take(3) })
+        put("seats", p.seats)
+        put("rent", p.rent)
+        put("active", p.active)
+    }
+
+    /** Accepts HH:MM or h:mm a; API always needs 24h HH:MM. */
+    fun normalizeDeparture(raw: String): String {
+        val t = raw.trim()
+        Regex("""^([01]?\d|2[0-3]):([0-5]\d)$""").matchEntire(t)?.let { m ->
+            return "%02d:%02d".format(m.groupValues[1].toInt(), m.groupValues[2].toInt())
+        }
+        Regex("""^(\d{1,2}):([0-5]\d)\s*([AaPp][Mm])$""").matchEntire(t)?.let { m ->
+            var h = m.groupValues[1].toInt()
+            val min = m.groupValues[2].toInt()
+            val pm = m.groupValues[3].equals("pm", true)
+            h = when {
+                pm && h < 12 -> h + 12
+                !pm && h == 12 -> 0
+                else -> h
+            }
+            return "%02d:%02d".format(h, min)
+        }
+        return t
+    }
 
     fun payoutAccount(o: JsonObject): WithdrawAccount? = method(o.s("method"))?.let { WithdrawAccount(it, o.s("account"), o.s("id")) }
 

@@ -63,3 +63,13 @@ fun NavController.openDeepLink(route: String) {
 
 /** Leave the logged-in area (logout). */
 fun NavController.navigateToLogin() = navigate(Routes.LOGIN) { popUpTo(graph.id) { inclusive = true }; launchSingleTop = true }
+
+/** After OTP / password login: set password → name → KYC / home. */
+fun NavController.continueAuth(gate: com.durpalla.driver.data.AuthGate) {
+    when {
+        gate.needsPassword -> go(Routes.SET_PASSWORD)
+        gate.needsName -> go(Routes.PROFILE_NAME)
+        gate.kycComplete -> navigateToHome()
+        else -> go(Routes.KYC_VEHICLE)
+    }
+}

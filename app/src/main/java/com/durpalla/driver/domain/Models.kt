@@ -89,11 +89,14 @@ data class PredefinedTrip(
     val vehicleType: VehicleType,
     val from: String,
     val to: String,
+    /** HH:MM when [openAnyTime] is false; ignored otherwise. */
     val departure: String,
     val days: Set<String>,
     val seats: Int,
     val rent: Int,
     val active: Boolean,
+    /** When true, customers can book for any departure time. */
+    val openAnyTime: Boolean = false,
 )
 
 data class Rating(val customer: String, val stars: Int, val comment: String, val date: LocalDate, val tripCode: String)
@@ -131,12 +134,14 @@ data class Driver(
     val online: Boolean = true,
     val walletBalance: Int = 0,
     val hasWithdrawPin: Boolean = false,
+    val hasPassword: Boolean = true,
     val serviceStoppageCount: Int = 0,
     val avatarUrl: String? = null,
 ) {
     /** Prefer real name; fall back to phone so Home/Profile are never blank. */
     val displayName: String get() = name.trim().ifBlank { phone.trim() }
     val needsDisplayName: Boolean get() = name.trim().length < 2
+    val needsPassword: Boolean get() = !hasPassword
     val needsKycResubmit: Boolean
         get() = !kycComplete && (
             kycStatus.equals("rejected", true) ||

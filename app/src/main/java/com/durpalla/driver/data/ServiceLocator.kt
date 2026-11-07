@@ -20,6 +20,9 @@ object ServiceLocator {
     val api: ApiClient by lazy { ApiClient(BuildConfig.API_BASE_URL, { session.token }, session::expire) }
 
     val auth: ApiAuthRepository by lazy { ApiAuthRepository(api, session, ::readImage) }
+    val biometricLogin: com.durpalla.driver.security.BiometricLoginStore by lazy {
+        com.durpalla.driver.security.BiometricLoginStore(appContext)
+    }
 
     /** KYC photo: read + downscale to ≤ 1600 px JPEG so uploads stay small. */
     private fun readImage(uri: String): Pair<ByteArray, String>? = runCatching {

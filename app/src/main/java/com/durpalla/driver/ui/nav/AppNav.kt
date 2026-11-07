@@ -27,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.durpalla.driver.domain.*
+import com.durpalla.driver.security.promptBiometric
 import com.durpalla.driver.ui.DriverViewModel
 import com.durpalla.driver.ui.LiveBanner
 import com.durpalla.driver.ui.components.LiveBannerCard
@@ -37,7 +38,10 @@ import com.durpalla.driver.ui.theme.DP
 
 object Routes {
     const val SPLASH = "splash"; const val LANGUAGE_PROMPT = "language/first"; const val LANGUAGE = "language"; const val LOGIN = "login"; const val OTP = "otp"
+    const val PASSWORD_LOGIN = "login/password"; const val SET_PASSWORD = "auth/password"
+    const val BIOMETRIC_SETUP = "auth/biometric"
     const val PROFILE_NAME = "profile/name"
+    const val AVATAR_CAMERA = "profile/avatar-camera"
     const val KYC_VEHICLE = "kyc/vehicle"; const val KYC_DOCS = "kyc/docs"; const val KYC_REVIEW = "kyc/review"
     const val HOME = "home"; const val REQUESTS = "requests?tab={tab}"; const val MY_TRIPS = "trips"; const val EARNINGS = "earnings"; const val PROFILE = "profile"
     const val INCOMING = "request/{id}"; const val BID = "request/{id}/bid"; const val CONFLICT = "request/{id}/conflict"
@@ -161,17 +165,72 @@ fun DriverApp(
             composable(Routes.LANGUAGE) {
                 LanguageSettingsScreen(AppLocale.language, { lang -> scope.launch { language.choose(lang); onLanguageApplied() } }) { nav.popBackStack() }
             }
-            composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.go(Routes.OTP) } } }
-            composable(Routes.OTP) {
-                OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code ->
-                    vm.verifyOtp(code) { needsName, kyc ->
-                        when {
-                            needsName -> nav.go(Routes.PROFILE_NAME)
-                            kyc -> nav.navigateToHome()
-                            else -> nav.go(Routes.KYC_VEHICLE)
+            composable(Routes.LOGIN) {
+                PhoneLoginScreen(auth, vm::setPhone) {
+                    vm.checkPhone { step ->
+                        when (step) {
+                            com.durpalla.driver.data.AuthStep.LOGIN -> nav.go(Routes.PASSWORD_LOGIN)
+                            com.durpalla.driver.data.AuthStep.OTP -> nav.go(Routes.OTP)
                         }
                     }
                 }
+            }
+            composable(Routes.PASSWORD_LOGIN) {
+                val bio = com.durpalla.driver.data.ServiceLocator.biometricLogin
+                val canBio = bio.canAuthenticate() && bio.isEnabledFor(auth.phone)
+                val activity = androidx.compose.ui.platform.LocalContext.current as? androidx.fragment.app.FragmentActivity
+                PasswordLoginScreen(
+                    auth,
+                    onBack = { nav.popBackStack() },
+                    onLogin = { pass -> vm.loginWithPassword(pass) { nav.continueAuth(it) } },
+                    onUseOtp = { vm.sendOtp { nav.go(Routes.OTP) } },
+                    biometricAvailable = canBio && activity != null,
+                    onBiometricLogin = {
+                        activity?.let { act ->
+                            act.promptBiometric(
+                                title = act.getString(R.string.biometric_prompt_login_title),
+                                subtitle = act.getString(R.string.biometric_prompt_login_sub),
+                                negativeButton = act.getString(R.string.cancel),
+                                onSuccess = {
+                                    val creds = bio.loadCredentials()
+                                    if (creds != null && creds.first == auth.phone) {
+                                        vm.loginWithPassword(creds.second) { nav.continueAuth(it) }
+                                    }
+                                },
+                            )
+                        }
+                    },
+                )
+            }
+            composable(Routes.OTP) {
+                OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code ->
+                    vm.verifyOtp(code) { nav.continueAuth(it) }
+                }
+            }
+            composable(Routes.SET_PASSWORD) {
+                SetPasswordScreen(auth) { pass ->
+                    vm.setPassword(pass) {
+                        nav.go(Routes.BIOMETRIC_SETUP) { popUpTo(Routes.SET_PASSWORD) { inclusive = true } }
+                    }
+                }
+            }
+            composable(Routes.BIOMETRIC_SETUP) {
+                fun afterBiometric() {
+                    vm.clearPendingPassword()
+                    when {
+                        driver.needsDisplayName -> nav.go(Routes.PROFILE_NAME) { popUpTo(Routes.BIOMETRIC_SETUP) { inclusive = true } }
+                        driver.kycComplete -> nav.navigateToHome()
+                        else -> nav.go(Routes.KYC_VEHICLE) { popUpTo(Routes.BIOMETRIC_SETUP) { inclusive = true } }
+                    }
+                }
+                BiometricSetupScreen(
+                    canEnable = !vm.pendingPasswordForBiometric.isNullOrBlank(),
+                    onEnable = {
+                        vm.pendingPasswordForBiometric?.let { vm.enableBiometricLogin(it) }
+                        afterBiometric()
+                    },
+                    onSkip = { afterBiometric() },
+                )
             }
             composable(Routes.PROFILE_NAME) {
                 DisplayNameScreen(initial = driver.name) {
@@ -184,15 +243,29 @@ fun DriverApp(
             }
             composable(Routes.KYC_VEHICLE) { KycVehicleScreen(auth.kycType, vm::setKycType, { nav.popBackStack() }) { nav.go(Routes.KYC_DOCS) } }
             composable(Routes.KYC_DOCS) {
-                // Tap a document → system photo picker; the URI is uploaded (multipart) on submit.
+                // Tap → pick photo → upload to server immediately (admin can verify).
                 var picking by remember { mutableStateOf<String?>(null) }
                 val picker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
-                    picking?.let { d -> if (uri != null) vm.setDocFile(d, uri.toString()) }; picking = null
+                    val type = picking
+                    picking = null
+                    if (type != null && uri != null) vm.uploadKycDoc(type, uri.toString())
                 }
-                KycDocumentsScreen(auth.uploaded, { d ->
-                    if (d in auth.uploaded) vm.setDocFile(d, null)
-                    else { picking = d; picker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-                }, { nav.popBackStack() }) { vm.submitKyc { nav.go(Routes.KYC_REVIEW) } }
+                KycDocumentsScreen(
+                    uploaded = auth.uploaded,
+                    uploading = auth.uploading,
+                    error = auth.error,
+                    loading = auth.loading,
+                    onPick = { d ->
+                        picking = d
+                        picker.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                            ),
+                        )
+                    },
+                    onBack = { nav.popBackStack() },
+                    onSubmit = { vm.submitKyc { nav.go(Routes.KYC_REVIEW) } },
+                )
             }
             composable(Routes.KYC_REVIEW) { KycReviewScreen { nav.navigateToHome() } }
 
@@ -200,8 +273,12 @@ fun DriverApp(
           navigation(startDestination = Routes.HOME, route = MAIN_GRAPH) {
 
             composable(Routes.HOME) {
-                LaunchedEffect(driver.id, driver.needsDisplayName) {
-                    if (driver.id.isNotBlank() && driver.needsDisplayName) nav.go(Routes.PROFILE_NAME)
+                LaunchedEffect(driver.id, driver.needsPassword, driver.needsDisplayName) {
+                    if (driver.id.isBlank()) return@LaunchedEffect
+                    when {
+                        driver.needsPassword -> nav.go(Routes.SET_PASSWORD)
+                        driver.needsDisplayName -> nav.go(Routes.PROFILE_NAME)
+                    }
                 }
                 HomeScreen(driver, online, vm::setOnline, summary, bids.count { it.status == BidStatus.PENDING },
                     trips.filter { it.status == TripStatus.UPCOMING }.minByOrNull { it.slot.start }, requests, blockedFn,
@@ -274,27 +351,17 @@ fun DriverApp(
             composable(Routes.RECON) { ReconciliationScreen(recon, vm::loadReconciliation) { nav.popBackStack() } }
             composable(Routes.WALLET) { WalletScreen(summary.walletBalance, txs, { nav.popBackStack() }) { vm.resetWithdraw(); nav.go(Routes.WITHDRAW) } }
 
-            composable(Routes.PROFILE) {
+            composable(Routes.AVATAR_CAMERA) {
                 val ctx = androidx.compose.ui.platform.LocalContext.current
-                val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(
-                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
-                ) { uri ->
-                    if (uri == null) return@rememberLauncherForActivityResult
-                    scope.launch {
-                        val bytes = com.durpalla.driver.data.AvatarCrop.fromUri(ctx, uri)
-                        if (bytes == null) {
-                            android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_failed), android.widget.Toast.LENGTH_SHORT).show()
-                            return@launch
-                        }
-                        ServiceLocator.profile.uploadAvatarJpeg(bytes)
-                            .onSuccess {
-                                android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_updated), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                            .onFailure {
-                                android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_failed), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                    }
-                }
+                AvatarCameraScreen(
+                    onDone = {
+                        android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_updated), android.widget.Toast.LENGTH_SHORT).show()
+                        nav.popBackStack()
+                    },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(Routes.PROFILE) {
                 ProfileScreen(
                     driver,
                     { nav.go(Routes.VEHICLES) }, { nav.go(Routes.RATINGS) }, { nav.go(Routes.HISTORY) }, { nav.go(Routes.PREDEF) },
@@ -302,13 +369,7 @@ fun DriverApp(
                     { vm.logout { nav.navigateToLogin() } }, onLanguage = { nav.go(Routes.LANGUAGE) },
                     onServiceArea = { nav.go(Routes.SERVICE_AREA) },
                     onEditName = { nav.go(Routes.PROFILE_NAME) },
-                    onChangePhoto = {
-                        avatarPicker.launch(
-                            androidx.activity.result.PickVisualMediaRequest(
-                                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
-                            ),
-                        )
-                    },
+                    onChangePhoto = { nav.go(Routes.AVATAR_CAMERA) },
                 )
             }
             composable(Routes.SERVICE_AREA) { ServiceAreaScreen { nav.popBackStack() } }

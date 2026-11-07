@@ -15,7 +15,17 @@ data class LiveBanner(val kind: Kind, val title: UiText, val body: UiText, val r
     enum class Kind { ACCEPTED, REQUEST, INFO, WARNING }
 }
 
-data class AuthState(val phone: String = "", val loading: Boolean = false, val error: UiText? = null, val kycType: VehicleType = VehicleType.SPEEDBOAT, val uploaded: Set<String> = emptySet(), val files: Map<String, String> = emptyMap())
+data class AuthState(
+    val phone: String = "",
+    val loading: Boolean = false,
+    val error: UiText? = null,
+    val kycType: VehicleType = VehicleType.SPEEDBOAT,
+    /** Doc types successfully stored on the server. */
+    val uploaded: Set<String> = emptySet(),
+    /** Doc types currently uploading. */
+    val uploading: Set<String> = emptySet(),
+    val files: Map<String, String> = emptyMap(),
+)
 
 /** [amount] is always ASCII digits (normalised on input), so parsing never depends on locale. */
 data class BidFormState(val amount: String = "", val note: String = "", val error: UiText? = null, val submitting: Boolean = false, val submitted: Bid? = null) {
@@ -127,31 +137,113 @@ class DriverViewModel(
     val authState: StateFlow<AuthState> = _auth
     /** Accepts Bangla (০-৯) or ASCII input; state and API always get ASCII. */
     fun setPhone(p: String) = _auth.update { it.copy(phone = DigitFormatter.digitsOnly(p, 11), error = null) }
+    /** Customer-style check: password account → LOGIN, else OTP sent → OTP. */
+    fun checkPhone(onOk: (com.durpalla.driver.data.AuthStep) -> Unit) = viewModelScope.launch {
+        if (_auth.value.phone.length != 11) { _auth.update { it.copy(error = UiText.res(R.string.err_phone)) }; return@launch }
+        _auth.update { it.copy(loading = true, error = null) }
+        val captcha = bot().token(BotProtection.LOGIN)
+        auth.checkPhone(_auth.value.phone, captcha)
+            .onSuccess { step -> _auth.update { it.copy(loading = false) }; onOk(step) }
+            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
+    }
     fun sendOtp(onOk: () -> Unit) = viewModelScope.launch {
         if (_auth.value.phone.length != 11) { _auth.update { it.copy(error = UiText.res(R.string.err_phone)) }; return@launch }
-        _auth.update { it.copy(loading = true) }
+        _auth.update { it.copy(loading = true, error = null) }
         val captcha = bot().token(BotProtection.LOGIN) // reCAPTCHA Enterprise; null when disabled
         auth.requestOtp(_auth.value.phone, captcha)
             .onSuccess { _auth.update { it.copy(loading = false) }; onOk() }
             .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
     }
-    /** onOk(needsName, kycDone) — name is required when OTP register left `drivers.name` empty. */
-    fun verifyOtp(code: String, onOk: (needsName: Boolean, kycDone: Boolean) -> Unit) = viewModelScope.launch {
+    fun verifyOtp(code: String, onOk: (com.durpalla.driver.data.AuthGate) -> Unit) = viewModelScope.launch {
+        _auth.update { it.copy(loading = true, error = null) }
         auth.verifyOtp(_auth.value.phone, DigitFormatter.digitsOnly(code, 6))
-            .onSuccess { kycDone ->
+            .onSuccess { gate ->
                 profileRepo.refresh()
-                onOk(driver.value.needsDisplayName, kycDone)
+                _auth.update { it.copy(loading = false) }
+                onOk(gate.copy(needsName = gate.needsName || driver.value.needsDisplayName))
             }
-            .onFailure { e -> _auth.update { it.copy(error = e.toUiText(R.string.err_otp)) } }
+            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_otp)) } }
+    }
+    fun loginWithPassword(password: String, onOk: (com.durpalla.driver.data.AuthGate) -> Unit) = viewModelScope.launch {
+        if (password.length < 8) { _auth.update { it.copy(error = UiText.res(R.string.err_password_short)) }; return@launch }
+        _auth.update { it.copy(loading = true, error = null) }
+        val phone = _auth.value.phone
+        auth.loginWithPassword(phone, password)
+            .onSuccess { gate ->
+                ServiceLocator.biometricLogin.refreshPasswordIfEnabled(phone, password)
+                profileRepo.refresh()
+                _auth.update { it.copy(loading = false) }
+                onOk(gate.copy(needsName = gate.needsName || driver.value.needsDisplayName))
+            }
+            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_password)) } }
+    }
+    /** Cleared after biometric setup (enable or skip) so it is never kept longer than needed. */
+    var pendingPasswordForBiometric: String? = null
+        private set
+    fun clearPendingPassword() { pendingPasswordForBiometric = null }
+    fun setPassword(password: String, onOk: () -> Unit) = viewModelScope.launch {
+        if (password.length < 8) { _auth.update { it.copy(error = UiText.res(R.string.err_password_short)) }; return@launch }
+        _auth.update { it.copy(loading = true, error = null) }
+        auth.setPassword(password)
+            .onSuccess {
+                pendingPasswordForBiometric = password
+                ServiceLocator.biometricLogin.refreshPasswordIfEnabled(_auth.value.phone, password)
+                profileRepo.refresh()
+                _auth.update { it.copy(loading = false) }
+                onOk()
+            }
+            .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
+    }
+    fun enableBiometricLogin(password: String): Boolean {
+        val phone = _auth.value.phone.ifBlank { driver.value.phone }
+        if (phone.isBlank() || password.length < 8) return false
+        val store = ServiceLocator.biometricLogin
+        if (!store.canAuthenticate()) return false
+        store.enable(phone, password)
+        clearPendingPassword()
+        return true
+    }
+    fun disableBiometricLogin() {
+        ServiceLocator.biometricLogin.disable()
+        clearPendingPassword()
     }
     fun setKycType(t: VehicleType) = _auth.update { it.copy(kycType = t) }
-    /** Photo picked for KYC document [d] (content URI); null clears it. */
-    fun setDocFile(d: String, uri: String?) = _auth.update {
-        if (uri == null) it.copy(uploaded = it.uploaded - d, files = it.files - d) else it.copy(uploaded = it.uploaded + d, files = it.files + (d to uri))
+    /** Pick photo → upload to server immediately for admin verification. */
+    fun uploadKycDoc(docType: String, uri: String) = viewModelScope.launch {
+        _auth.update {
+            it.copy(
+                uploading = it.uploading + docType,
+                files = it.files + (docType to uri),
+                error = null,
+            )
+        }
+        auth.uploadKycDocument(docType, uri)
+            .onSuccess {
+                _auth.update {
+                    it.copy(uploading = it.uploading - docType, uploaded = it.uploaded + docType)
+                }
+            }
+            .onFailure { e ->
+                _auth.update {
+                    it.copy(
+                        uploading = it.uploading - docType,
+                        files = it.files - docType,
+                        uploaded = it.uploaded - docType,
+                        error = e.toUiText(R.string.err_kyc_docs),
+                    )
+                }
+            }
+    }
+    fun clearKycDoc(docType: String) = _auth.update {
+        it.copy(uploaded = it.uploaded - docType, uploading = it.uploading - docType, files = it.files - docType)
     }
     fun submitKyc(onOk: () -> Unit) = viewModelScope.launch {
+        if (_auth.value.uploaded.size < 3) {
+            _auth.update { it.copy(error = UiText.res(R.string.err_kyc_docs)) }
+            return@launch
+        }
         _auth.update { it.copy(loading = true, error = null) }
-        auth.submitKyc(_auth.value.kycType, _auth.value.files)
+        auth.submitKyc(_auth.value.kycType, emptyMap())
             .onSuccess { _auth.update { it.copy(loading = false) }; profileRepo.refresh(); onOk() }
             .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
     }

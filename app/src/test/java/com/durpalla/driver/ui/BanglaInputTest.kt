@@ -44,7 +44,9 @@ class BanglaInputTest {
     private class RecordingAuth(private val d: AuthRepository) : AuthRepository by d {
         val bodies = mutableListOf<String>()
         override suspend fun requestOtp(phone: String, captchaToken: String?): Result<Unit> { bodies += ApiJson.requestOtp(phone, captchaToken); return d.requestOtp(phone, captchaToken) }
-        override suspend fun verifyOtp(phone: String, code: String): Result<Boolean> { bodies += ApiJson.verifyOtp(phone, code); return d.verifyOtp(phone, code) }
+        override suspend fun verifyOtp(phone: String, code: String): Result<com.durpalla.driver.data.AuthGate> {
+            bodies += ApiJson.verifyOtp(phone, code); return d.verifyOtp(phone, code)
+        }
     }
     private class RecordingEarnings(private val d: EarningsRepository) : EarningsRepository by d {
         var amount: Int? = null; var pin: String? = null
