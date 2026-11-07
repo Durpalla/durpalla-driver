@@ -1,0 +1,25 @@
+---
+description: Pull the remote branch before applying any local changes
+alwaysApply: true
+---
+
+# Pull remote before changes
+
+Before creating, editing, or deleting any project file, pull the current branch from its remote tracking branch. Do this in every repo that will be changed.
+
+## Required sequence
+
+1. Identify every git repo that will be changed.
+2. Run `git status -sb` in that repo.
+3. Run `git pull` against the current branch's upstream.
+4. Apply changes only after the pull succeeds.
+
+## Stop instead of changing
+
+- The pull fails (conflicts, rejected update, no upstream, or a network error).
+- Uncommitted local work would be overwritten or would block the pull.
+- The branch has diverged and a merge or rebase needs a decision.
+
+Do not stash, reset, discard, or force-update to make the pull succeed unless the user explicitly asks.
+
+Read-only work (questions, search, review) does not require a pull.
