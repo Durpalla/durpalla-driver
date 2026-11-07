@@ -46,10 +46,10 @@ fun HomeScreen(
 ) {
     Column(Modifier.fillMaxSize().background(DP.Bg)) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(driver.name)
+            Avatar(driver.displayName, imageUrl = driver.avatarUrl)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(stringResource(greetingRes()), color = DP.Muted, fontSize = 12.sp)
-                Text("${driver.name} ★ ${num(driver.rating)}", style = MaterialTheme.typography.titleMedium)
+                Text("${driver.displayName} ★ ${num(driver.rating)}", style = MaterialTheme.typography.titleMedium)
             }
             if (online) LiveIndicator(connection)
             IconButton(onClick = onNotifications) { BadgedBox(badge = { Badge(containerColor = DP.Accent) }) { Icon(Icons.Filled.Notifications, stringResource(R.string.notifications)) } }
@@ -79,9 +79,16 @@ fun HomeScreen(
                 }
             }
             SectionHeader(stringResource(R.string.new_requests), stringResource(R.string.see_all), onSeeAll)
-            if (driver.serviceStoppageCount <= 0) EmptyState(stringResource(R.string.service_area_home_hint))
-            else if (!online) EmptyState(stringResource(R.string.youre_offline))
-            else requests.take(3).forEach { r -> RequestCard(r, isBlocked(r), onClick = { onRequest(r) }, onSkip = { onSkip(r) }) }
+            when {
+                driver.serviceStoppageCount <= 0 -> EmptyState(stringResource(R.string.service_area_home_hint))
+                requests.isEmpty() -> EmptyState(
+                    if (!online) stringResource(R.string.home_offline_browse) else stringResource(R.string.no_requests),
+                )
+                else -> {
+                    if (!online) Text(stringResource(R.string.home_offline_browse), color = DP.Muted, fontSize = 12.sp)
+                    requests.take(3).forEach { r -> RequestCard(r, isBlocked(r), onClick = { onRequest(r) }, onSkip = { onSkip(r) }) }
+                }
+            }
         }
     }
 }
@@ -94,7 +101,7 @@ fun RequestCard(r: TripRequest, blocked: Boolean, onClick: () -> Unit, onSkip: (
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 RouteText(r.from, r.to)
                 Text(str(R.string.dot_join, r.slot.label(), pax(r.passengers)), color = DP.Muted, fontSize = 12.sp)
-                RatingText(r.customer.rating, str(R.string.customer_range, taka(r.suggestedMin), taka(r.suggestedMax)))
+                RatingText(r.customer.rating, str(R.string.customer_range, taka(r.displaySuggestedMin), taka(r.displaySuggestedMax)))
             }
             if (blocked) StatusChip(stringResource(R.string.slot_booked), Tone.DANGER) else StatusChip(r.vehicleType.title(), Tone.PRIMARY)
         }
@@ -143,7 +150,7 @@ fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, o
                 Row(verticalAlignment = Alignment.CenterVertically) { VehicleBadge(r.vehicleType); Spacer(Modifier.width(12.dp)); RouteText(r.from, r.to, MaterialTheme.typography.titleLarge) }
                 Spacer(Modifier.height(8.dp))
                 KeyValue(stringResource(R.string.slot), r.slot.label()); KeyValue(stringResource(R.string.passengers), r.passengers.l()); KeyValue(stringResource(R.string.distance), str(R.string.km, num(r.distanceKm)))
-                KeyValue(stringResource(R.string.suggested_rent), str(R.string.range, taka(r.suggestedMin), taka(r.suggestedMax)), DP.Primary500, true)
+                KeyValue(stringResource(R.string.suggested_rent), str(R.string.range, taka(r.displaySuggestedMin), taka(r.displaySuggestedMax)), DP.Primary500, true)
                 if (r.note.isNotBlank()) KeyValue(stringResource(R.string.note), r.note.toLocalDigits())
             }
             DCard {
@@ -172,7 +179,7 @@ fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Uni
             LiveBidPanel(r, live, connection)
             DCard(color = DP.Primary100, border = null) {
                 Text(stringResource(R.string.suggested_range), color = DP.Primary600, fontSize = 12.sp)
-                Text(str(R.string.range, taka(r.suggestedMin), taka(r.suggestedMax)), style = MaterialTheme.typography.titleLarge, color = DP.Primary700)
+                Text(str(R.string.range, taka(r.displaySuggestedMin), taka(r.displaySuggestedMax)), style = MaterialTheme.typography.titleLarge, color = DP.Primary700)
                 Text(stringResource(R.string.suggested_basis), color = DP.Muted, fontSize = 12.sp)
             }
             OutlinedTextField(
@@ -182,7 +189,7 @@ fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Uni
                 isError = form.error != null, supportingText = { form.error?.let { Text(it.asString()) } },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(r.suggestedMin, (r.suggestedMin + r.suggestedMax) / 2, r.suggestedMax).forEach { v ->
+                r.bidChipAmounts.forEach { v ->
                     DurpallaButton(taka(v), { onAmount(v.toString()) }, Modifier.weight(1f), ButtonVariant.Secondary, ButtonSize.Small)
                 }
             }

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.durpalla.driver.R
+import com.durpalla.driver.auth.SmsOtpUserConsent
 import com.durpalla.driver.ui.AuthState
 import com.durpalla.driver.ui.components.ButtonVariant
 import com.durpalla.driver.ui.components.DurpallaButton
@@ -169,12 +170,13 @@ fun PhoneLoginScreen(state: AuthState, onPhone: (String) -> Unit, onSend: () -> 
     }
 }
 
-/** Six separate digit boxes backed by one BasicTextField (paste & IME friendly). */
+/** Six separate digit boxes backed by one BasicTextField (paste, IME & SMS autofill). */
 @Composable
 fun OtpBoxes(code: String, onChange: (String) -> Unit, isError: Boolean) {
     BasicTextField(
         value = code, onValueChange = { onChange(DigitFormatter.digitsOnly(it, 6)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
         decorationBox = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(6) { i ->
@@ -196,7 +198,16 @@ fun OtpBoxes(code: String, onChange: (String) -> Unit, isError: Boolean) {
 fun OtpScreen(phone: String, error: com.durpalla.driver.i18n.UiText?, onBack: () -> Unit, onVerify: (String) -> Unit) {
     var code by remember { mutableStateOf("") }
     var seconds by remember { mutableIntStateOf(30) }
+    var smsListenKey by remember { mutableIntStateOf(0) }
+    var smsSubmitted by remember { mutableStateOf(false) }
     LaunchedEffect(seconds) { if (seconds > 0) { delay(1000); seconds-- } }
+    SmsOtpUserConsent(restartKey = smsListenKey) { captured ->
+        code = captured
+        if (!smsSubmitted && captured.length == 6) {
+            smsSubmitted = true
+            onVerify(captured)
+        }
+    }
     val shown = phone.removePrefix("0").let { if (it.length == 10) "+880 ${it.take(4)}-${it.drop(4)}" else "+880 $it" }
     BrandedAuthLayout(onBack = onBack) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -211,7 +222,11 @@ fun OtpScreen(phone: String, error: com.durpalla.driver.i18n.UiText?, onBack: ()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text(stringResource(R.string.otp_didnt_get), color = DP.Muted, fontSize = 13.sp)
             Text(if (seconds > 0) str(R.string.otp_resend_in, "0:${seconds.toString().padStart(2, '0')}") else stringResource(R.string.otp_resend), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                color = if (seconds > 0) DP.Muted else DP.Primary500, modifier = Modifier.clickable(enabled = seconds == 0) { seconds = 30 })
+                color = if (seconds > 0) DP.Muted else DP.Primary500, modifier = Modifier.clickable(enabled = seconds == 0) {
+                    seconds = 30
+                    smsListenKey++
+                    smsSubmitted = false
+                })
         }
         Text(stringResource(R.string.otp_wrong_number), color = DP.Primary500, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onBack))

@@ -91,6 +91,12 @@
     <string name="ds_review">যাচাই চলছে</string>
     <string name="ds_missing">আপলোড করুন</string>
     <string name="ds_expiring">মেয়াদ শেষ হচ্ছে</string>
+    <string name="ds_rejected">প্রত্যাখ্যাত</string>
+    <string name="view_document">দেখুন</string>
+    <string name="reupload_documents">কাগজপত্র আবার আপলোড করুন</string>
+    <string name="kyc_rejected_banner">কিছু কাগজপত্র প্রত্যাখ্যান হয়েছে। যাচাই চালিয়ে যেতে আবার আপলোড করুন।</string>
+    <string name="doc_open_failed">কাগজটি খোলা যায়নি। আবার চেষ্টা করুন।</string>
+    <string name="home_offline_browse">আপনি অফলাইন — রিকোয়েস্ট দেখা যাবে। নোটিফিকেশন পেতে অনলাইন হোন।</string>
     <string name="ts_upcoming">আসন্ন</string>
     <string name="ts_on_the_way">পথে আছেন</string>
     <string name="ts_arrived">পৌঁছেছেন</string>
@@ -460,4 +466,14 @@
     <string name="notif_cancelled_body">যাত্রী এই ট্রিপ বাতিল করেছেন।</string>
     <string name="notif_payment_title">পেমেন্ট পাওয়া গেছে</string>
     <string name="notif_payment_body">%1$s আপনার ওয়ালেটে যোগ হয়েছে।</string>
+    <string name="notif_welcome_title">ডুরপাল্লা ড্রাইভারে স্বাগতম</string>
+    <string name="notif_welcome_body">যোগ দেওয়ার জন্য ধন্যবাদ। ট্রিপ রিকোয়েস্ট পেতে যাচাইকরণ সম্পন্ন করুন।</string>
+    <string name="your_name_title">আপনার নাম</string>
+    <string name="your_name_label">পূর্ণ নাম</string>
+    <string name="your_name_sub">বিড ও ট্রিপে যাত্রীরা এই নাম দেখবেন।</string>
+    <string name="continue_label">এগিয়ে যান</string>
+    <string name="edit_name">নাম সম্পাদনা</string>
+    <string name="change_photo">ছবি বদলান</string>
+    <string name="avatar_updated">প্রোফাইল ছবি আপডেট হয়েছে</string>
+    <string name="avatar_failed">ছবি আপডেট হয়নি। আবার চেষ্টা করুন।</string>
 </resources>

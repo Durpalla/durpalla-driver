@@ -135,8 +135,14 @@ class DriverViewModel(
             .onSuccess { _auth.update { it.copy(loading = false) }; onOk() }
             .onFailure { e -> _auth.update { it.copy(loading = false, error = e.toUiText(R.string.err_generic)) } }
     }
-    fun verifyOtp(code: String, onOk: (kycDone: Boolean) -> Unit) = viewModelScope.launch {
-        auth.verifyOtp(_auth.value.phone, DigitFormatter.digitsOnly(code, 6)).onSuccess(onOk).onFailure { e -> _auth.update { it.copy(error = e.toUiText(R.string.err_otp)) } }
+    /** onOk(needsName, kycDone) — name is required when OTP register left `drivers.name` empty. */
+    fun verifyOtp(code: String, onOk: (needsName: Boolean, kycDone: Boolean) -> Unit) = viewModelScope.launch {
+        auth.verifyOtp(_auth.value.phone, DigitFormatter.digitsOnly(code, 6))
+            .onSuccess { kycDone ->
+                profileRepo.refresh()
+                onOk(driver.value.needsDisplayName, kycDone)
+            }
+            .onFailure { e -> _auth.update { it.copy(error = e.toUiText(R.string.err_otp)) } }
     }
     fun setKycType(t: VehicleType) = _auth.update { it.copy(kycType = t) }
     /** Photo picked for KYC document [d] (content URI); null clears it. */

@@ -52,6 +52,24 @@ class ApiClient(baseUrl: String, token: () -> String?, onUnauthorized: () -> Uni
     suspend fun patch(path: String, body: Any?) = exec(Request.Builder().url(url(path)).patch(body(body)))
     suspend fun delete(path: String, body: Any? = null) = exec(Request.Builder().url(url(path)).delete(body?.let(::body)))
 
+    /** Authenticated binary download (KYC document preview). */
+    suspend fun getBytes(path: String): Result<Pair<ByteArray, String?>> = withContext(Dispatchers.IO) {
+        try {
+            http.newCall(Request.Builder().url(url(path)).get().build()).execute().use { r ->
+                val bytes = r.body?.bytes() ?: ByteArray(0)
+                val mime = r.header("Content-Type")
+                if (r.isSuccessful) Result.success(bytes to mime)
+                else {
+                    val text = bytes.toString(Charsets.UTF_8)
+                    val root = runCatching { JsonParser.parseString(text) }.getOrNull()?.takeIf { it.isJsonObject }?.asJsonObject
+                    Result.failure(error(r.code, root))
+                }
+            }
+        } catch (e: IOException) {
+            Result.failure(ApiException(0, ApiException.NETWORK, e.message ?: "network"))
+        }
+    }
+
     private fun url(path: String, query: Map<String, String?> = emptyMap()) = (base + path.trimStart('/')).toHttpUrl().newBuilder()
         .apply { query.forEach { (k, v) -> if (v != null) addQueryParameter(k, v) } }.build()
     private fun body(b: Any?): RequestBody = (if (b == null) "{}" else gson.toJson(b)).toRequestBody(json)

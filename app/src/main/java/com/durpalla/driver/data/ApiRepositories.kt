@@ -248,8 +248,33 @@ class ApiProfileRepository(private val api: ApiClient, private val trips: TripRe
             val list = body.get("stoppages")?.objects().orEmpty().map(ApiMappers::serviceStoppage)
             val count = body.get("selectedIds")?.asJsonArray?.size() ?: list.count { it.selected }
             _driver.value = _driver.value.copy(serviceStoppageCount = count)
+            // Feed is filtered by service area — refresh so matching RFQs appear immediately.
+            runCatching { ServiceLocator.requests.refresh() }
             list
         }
+
+    override suspend fun updateName(name: String): Result<Driver> =
+        api.patch("me", mapOf("name" to name.trim())).mapCatching { d ->
+            val before = _driver.value
+            ApiMappers.driver(d.asJsonObject, null).copy(documents = before.documents).also { _driver.value = it }
+        }
+
+    override suspend fun uploadAvatarJpeg(bytes: ByteArray): Result<Driver> = runCatching {
+        val body = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM)
+            .addFormDataPart("avatar", "avatar.jpg", bytes.toRequestBody("image/jpeg".toMediaTypeOrNull()))
+            .build()
+        val data = api.post("me/avatar", body).getOrThrow().asJsonObject
+        val before = _driver.value
+        val driverJson = data.o("driver")
+        val updated = if (driverJson != null) {
+            ApiMappers.driver(driverJson, null).copy(documents = before.documents)
+        } else {
+            val url = data.s("avatarUrl").ifBlank { data.s("avatar") }.ifBlank { data.s("photo") }
+            before.copy(avatarUrl = url.ifBlank { before.avatarUrl })
+        }
+        _driver.value = updated
+        updated
+    }
 
     override fun clear() { _driver.value = Driver.Empty; _ratings.value = emptyList(); _notifications.value = emptyList() }
 }

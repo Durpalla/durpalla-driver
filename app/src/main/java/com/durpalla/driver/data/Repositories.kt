@@ -75,5 +75,8 @@ interface ProfileRepository {
     suspend fun markNotificationsRead(): Result<Unit>
     suspend fun loadServiceStoppages(): Result<List<ServiceStoppage>>
     suspend fun saveServiceStoppages(ids: List<Int>): Result<List<ServiceStoppage>>
+    suspend fun updateName(name: String): Result<Driver>
+    /** JPEG bytes already cropped to 100×100 (customer parity). */
+    suspend fun uploadAvatarJpeg(bytes: ByteArray): Result<Driver>
     fun clear()
 }

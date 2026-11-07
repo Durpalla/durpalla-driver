@@ -32,7 +32,22 @@ data class TripRequest(
     val note: String = "",
     val distanceKm: Double = 0.0,
     val status: RequestStatus = RequestStatus.OPEN,
-)
+) {
+    /** Never 0 — older API builds could omit boat rates and send null→0. */
+    val displaySuggestedMin: Int get() = suggestedMin.takeIf { it > 0 } ?: 2000
+    val displaySuggestedMax: Int
+        get() {
+            val min = displaySuggestedMin
+            val max = suggestedMax.takeIf { it > 0 } ?: (min * 115 / 100)
+            return max.coerceAtLeast(min)
+        }
+    val bidChipAmounts: List<Int>
+        get() {
+            val min = displaySuggestedMin
+            val max = displaySuggestedMax
+            return listOf(min, (min + max) / 2, max).distinct()
+        }
+}
 
 enum class BidStatus(val label: String) { PENDING("Pending"), WON("Won"), LOST("Lost"), EXPIRED("Expired") }
 
@@ -85,8 +100,20 @@ data class Rating(val customer: String, val stars: Int, val comment: String, val
 
 data class Vehicle(val name: String, val type: VehicleType, val reg: String, val seats: Int, val verified: Boolean)
 
-data class DocumentItem(val name: String, val status: DocStatus)
-enum class DocStatus(val label: String) { VERIFIED("Verified"), UNDER_REVIEW("Under review"), MISSING("Upload"), EXPIRING("Expiring soon") }
+data class DocumentItem(
+    val name: String,
+    val status: DocStatus,
+    val type: String = "",
+    val note: String = "",
+    val viewPath: String? = null,
+)
+enum class DocStatus(val label: String) {
+    VERIFIED("Verified"),
+    UNDER_REVIEW("Under review"),
+    MISSING("Upload"),
+    EXPIRING("Expiring soon"),
+    REJECTED("Rejected"),
+}
 
 data class Driver(
     val name: String,
@@ -98,12 +125,24 @@ data class Driver(
     val documents: List<DocumentItem>,
     val id: String = "",
     val kycComplete: Boolean = false,
+    val kycStatus: String = "",
+    val kycNote: String = "",
     val canBid: Boolean = false,
     val online: Boolean = true,
     val walletBalance: Int = 0,
     val hasWithdrawPin: Boolean = false,
     val serviceStoppageCount: Int = 0,
+    val avatarUrl: String? = null,
 ) {
+    /** Prefer real name; fall back to phone so Home/Profile are never blank. */
+    val displayName: String get() = name.trim().ifBlank { phone.trim() }
+    val needsDisplayName: Boolean get() = name.trim().length < 2
+    val needsKycResubmit: Boolean
+        get() = !kycComplete && (
+            kycStatus.equals("rejected", true) ||
+                kycStatus.equals("cancelled", true) ||
+                documents.any { it.status == DocStatus.REJECTED || it.status == DocStatus.MISSING }
+            )
     companion object {
         /** Before GET me has loaded (not sample data: every field is blank). */
         val Empty = Driver("", "", 0.0, 0, "", emptyList(), emptyList())

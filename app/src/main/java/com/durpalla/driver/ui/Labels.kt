@@ -14,7 +14,13 @@ import com.durpalla.driver.realtime.ConnectionState
 }
 @get:StringRes val BidStatus.res: Int get() = when (this) { BidStatus.PENDING -> R.string.bs_pending; BidStatus.WON -> R.string.bs_won; BidStatus.LOST -> R.string.bs_lost; BidStatus.EXPIRED -> R.string.bs_expired }
 @get:StringRes val PaymentMethod.res: Int get() = when (this) { PaymentMethod.CASH -> R.string.pm_cash; PaymentMethod.BKASH -> R.string.pm_bkash; PaymentMethod.NAGAD -> R.string.pm_nagad; PaymentMethod.BANK -> R.string.pm_bank }
-@get:StringRes val DocStatus.res: Int get() = when (this) { DocStatus.VERIFIED -> R.string.ds_verified; DocStatus.UNDER_REVIEW -> R.string.ds_review; DocStatus.MISSING -> R.string.ds_missing; DocStatus.EXPIRING -> R.string.ds_expiring }
+@get:StringRes val DocStatus.res: Int get() = when (this) {
+    DocStatus.VERIFIED -> R.string.ds_verified
+    DocStatus.UNDER_REVIEW -> R.string.ds_review
+    DocStatus.MISSING -> R.string.ds_missing
+    DocStatus.EXPIRING -> R.string.ds_expiring
+    DocStatus.REJECTED -> R.string.ds_rejected
+}
 @get:StringRes val TripStatus.res: Int get() = when (this) {
     TripStatus.UPCOMING -> R.string.ts_upcoming; TripStatus.ON_THE_WAY -> R.string.ts_on_the_way; TripStatus.ARRIVED -> R.string.ts_arrived
     TripStatus.IN_PROGRESS -> R.string.ts_in_progress; TripStatus.COMPLETED -> R.string.ts_completed; TripStatus.CANCELLED -> R.string.ts_cancelled

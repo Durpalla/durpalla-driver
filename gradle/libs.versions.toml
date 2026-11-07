@@ -16,6 +16,7 @@ firebaseBom = "33.7.0"
 googleServices = "4.4.2"
 pusher = "2.4.4"
 recaptcha = "18.6.1"
+playServicesAuthApiPhone = "18.1.0"
 gson = "2.11.0"
 appcompat = "1.7.0"
 datastore = "1.1.1"
@@ -46,6 +47,7 @@ firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging
 firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
 pusher-java-client = { group = "com.pusher", name = "pusher-java-client", version.ref = "pusher" }
 recaptcha = { group = "com.google.android.recaptcha", name = "recaptcha", version.ref = "recaptcha" }
+play-services-auth-api-phone = { group = "com.google.android.gms", name = "play-services-auth-api-phone", version.ref = "playServicesAuthApiPhone" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }

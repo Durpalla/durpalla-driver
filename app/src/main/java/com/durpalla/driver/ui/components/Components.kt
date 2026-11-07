@@ -18,11 +18,19 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +40,8 @@ import androidx.compose.ui.unit.sp
 import com.durpalla.driver.R
 import com.durpalla.driver.domain.*
 import com.durpalla.driver.ui.theme.DP
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,9 +127,31 @@ fun VehicleBadge(type: VehicleType, size: Dp = 48.dp) {
 }
 
 @Composable
-fun Avatar(name: String, size: Dp = 44.dp) {
-    Box(Modifier.size(size).clip(CircleShape).background(DP.Primary200), contentAlignment = Alignment.Center) {
-        Text(name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString(""), color = DP.Primary700, fontWeight = FontWeight.Bold)
+fun Avatar(name: String, size: Dp = 44.dp, imageUrl: String? = null, onClick: (() -> Unit)? = null) {
+    var bmp by remember(imageUrl) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(imageUrl) {
+        bmp = null
+        val url = imageUrl?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        bmp = withContext(Dispatchers.IO) {
+            runCatching {
+                java.net.URL(url).openStream().use { stream ->
+                    android.graphics.BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            }.getOrNull()
+        }
+    }
+    val mod = Modifier.size(size).clip(CircleShape).background(DP.Primary200).then(
+        if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+    )
+    Box(mod, contentAlignment = Alignment.Center) {
+        val img = bmp
+        if (img != null) {
+            Image(bitmap = img, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            val initials = name.split(" ").mapNotNull { it.firstOrNull()?.uppercaseChar() }.take(2).joinToString("")
+                .ifBlank { name.take(1).uppercase() }
+            Text(initials, color = DP.Primary700, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

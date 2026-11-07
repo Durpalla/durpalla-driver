@@ -111,6 +111,12 @@
     <string name="ds_review">Under review</string>
     <string name="ds_missing">Upload</string>
     <string name="ds_expiring">Expiring soon</string>
+    <string name="ds_rejected">Rejected</string>
+    <string name="view_document">View</string>
+    <string name="reupload_documents">Re-upload documents</string>
+    <string name="kyc_rejected_banner">Some documents were rejected. Re-upload to continue verification.</string>
+    <string name="doc_open_failed">Could not open this document. Try again.</string>
+    <string name="home_offline_browse">You\'re offline — you can still browse requests. Go online to get notified.</string>
     <string name="ts_upcoming">Upcoming</string>
     <string name="ts_on_the_way">On the way</string>
     <string name="ts_arrived">Arrived</string>
@@ -490,4 +496,14 @@
     <string name="notif_cancelled_body">The customer cancelled this trip.</string>
     <string name="notif_payment_title">Payment received</string>
     <string name="notif_payment_body">%1$s added to your wallet.</string>
+    <string name="notif_welcome_title">Welcome to Durpalla Driver</string>
+    <string name="notif_welcome_body">Thanks for joining. Complete verification to start receiving trip requests.</string>
+    <string name="your_name_title">Your name</string>
+    <string name="your_name_label">Full name</string>
+    <string name="your_name_sub">Customers see this name on your bids and trips.</string>
+    <string name="continue_label">Continue</string>
+    <string name="edit_name">Edit name</string>
+    <string name="change_photo">Change photo</string>
+    <string name="avatar_updated">Profile photo updated</string>
+    <string name="avatar_failed">Could not update photo. Try again.</string>
 </resources>

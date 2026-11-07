@@ -43,6 +43,13 @@
         </service>
         <service android:name=".call.CallService" android:exported="false" android:foregroundServiceType="microphone" />
         <receiver android:name=".call.CallActionReceiver" android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
         <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="general" />
         <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_durpalla" />
         <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/primary_500" />

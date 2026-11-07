@@ -37,6 +37,7 @@ import com.durpalla.driver.ui.theme.DP
 
 object Routes {
     const val SPLASH = "splash"; const val LANGUAGE_PROMPT = "language/first"; const val LANGUAGE = "language"; const val LOGIN = "login"; const val OTP = "otp"
+    const val PROFILE_NAME = "profile/name"
     const val KYC_VEHICLE = "kyc/vehicle"; const val KYC_DOCS = "kyc/docs"; const val KYC_REVIEW = "kyc/review"
     const val HOME = "home"; const val REQUESTS = "requests?tab={tab}"; const val MY_TRIPS = "trips"; const val EARNINGS = "earnings"; const val PROFILE = "profile"
     const val INCOMING = "request/{id}"; const val BID = "request/{id}/bid"; const val CONFLICT = "request/{id}/conflict"
@@ -161,7 +162,26 @@ fun DriverApp(
                 LanguageSettingsScreen(AppLocale.language, { lang -> scope.launch { language.choose(lang); onLanguageApplied() } }) { nav.popBackStack() }
             }
             composable(Routes.LOGIN) { PhoneLoginScreen(auth, vm::setPhone) { vm.sendOtp { nav.go(Routes.OTP) } } }
-            composable(Routes.OTP) { OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code -> vm.verifyOtp(code) { kyc -> if (kyc) nav.navigateToHome() else nav.go(Routes.KYC_VEHICLE) } } }
+            composable(Routes.OTP) {
+                OtpScreen(auth.phone, auth.error, { nav.popBackStack() }) { code ->
+                    vm.verifyOtp(code) { needsName, kyc ->
+                        when {
+                            needsName -> nav.go(Routes.PROFILE_NAME)
+                            kyc -> nav.navigateToHome()
+                            else -> nav.go(Routes.KYC_VEHICLE)
+                        }
+                    }
+                }
+            }
+            composable(Routes.PROFILE_NAME) {
+                DisplayNameScreen(initial = driver.name) {
+                    when {
+                        nav.previousBackStackEntry != null && nav.hasHome() -> nav.popBackStack()
+                        driver.kycComplete -> nav.navigateToHome()
+                        else -> nav.go(Routes.KYC_VEHICLE)
+                    }
+                }
+            }
             composable(Routes.KYC_VEHICLE) { KycVehicleScreen(auth.kycType, vm::setKycType, { nav.popBackStack() }) { nav.go(Routes.KYC_DOCS) } }
             composable(Routes.KYC_DOCS) {
                 // Tap a document → system photo picker; the URI is uploaded (multipart) on submit.
@@ -180,6 +200,9 @@ fun DriverApp(
           navigation(startDestination = Routes.HOME, route = MAIN_GRAPH) {
 
             composable(Routes.HOME) {
+                LaunchedEffect(driver.id, driver.needsDisplayName) {
+                    if (driver.id.isNotBlank() && driver.needsDisplayName) nav.go(Routes.PROFILE_NAME)
+                }
                 HomeScreen(driver, online, vm::setOnline, summary, bids.count { it.status == BidStatus.PENDING },
                     trips.filter { it.status == TripStatus.UPCOMING }.minByOrNull { it.slot.start }, requests, blockedFn,
                     onNotifications = { nav.go(Routes.NOTIFS) }, onUpcoming = { nav.go(Routes.trip(it.id)) },
@@ -191,7 +214,7 @@ fun DriverApp(
             composable(Routes.INCOMING) { e ->
                 val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
                 IncomingRequestScreen(r, vm.conflictFor(r), { nav.popBackStack() }, { vm.skip(r.id); nav.popBackStack() },
-                    { vm.resetBid(r.suggestedMin); nav.go(Routes.bid(r.id)) }, { nav.go(Routes.conflict(r.id)) }, live[r.id], connection)
+                    { vm.resetBid(r.displaySuggestedMin); nav.go(Routes.bid(r.id)) }, { nav.go(Routes.conflict(r.id)) }, live[r.id], connection)
             }
             composable(Routes.BID) { e ->
                 val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
@@ -252,13 +275,50 @@ fun DriverApp(
             composable(Routes.WALLET) { WalletScreen(summary.walletBalance, txs, { nav.popBackStack() }) { vm.resetWithdraw(); nav.go(Routes.WITHDRAW) } }
 
             composable(Routes.PROFILE) {
-                ProfileScreen(driver, { nav.go(Routes.VEHICLES) }, { nav.go(Routes.RATINGS) }, { nav.go(Routes.HISTORY) }, { nav.go(Routes.PREDEF) },
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+                ) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    scope.launch {
+                        val bytes = com.durpalla.driver.data.AvatarCrop.fromUri(ctx, uri)
+                        if (bytes == null) {
+                            android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_failed), android.widget.Toast.LENGTH_SHORT).show()
+                            return@launch
+                        }
+                        ServiceLocator.profile.uploadAvatarJpeg(bytes)
+                            .onSuccess {
+                                android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_updated), android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            .onFailure {
+                                android.widget.Toast.makeText(ctx, ctx.getString(R.string.avatar_failed), android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                }
+                ProfileScreen(
+                    driver,
+                    { nav.go(Routes.VEHICLES) }, { nav.go(Routes.RATINGS) }, { nav.go(Routes.HISTORY) }, { nav.go(Routes.PREDEF) },
                     { nav.go(Routes.CALENDAR) }, { nav.go(Routes.WALLET) }, { nav.go(Routes.SUPPORT) }, { nav.go(Routes.NOTIFS) },
                     { vm.logout { nav.navigateToLogin() } }, onLanguage = { nav.go(Routes.LANGUAGE) },
-                    onServiceArea = { nav.go(Routes.SERVICE_AREA) })
+                    onServiceArea = { nav.go(Routes.SERVICE_AREA) },
+                    onEditName = { nav.go(Routes.PROFILE_NAME) },
+                    onChangePhoto = {
+                        avatarPicker.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                            ),
+                        )
+                    },
+                )
             }
             composable(Routes.SERVICE_AREA) { ServiceAreaScreen { nav.popBackStack() } }
-            composable(Routes.VEHICLES) { VehiclesScreen(driver) { nav.popBackStack() } }
+            composable(Routes.VEHICLES) {
+                VehiclesScreen(
+                    driver,
+                    onBack = { nav.popBackStack() },
+                    onReupload = { nav.go(Routes.KYC_VEHICLE) },
+                )
+            }
             composable(Routes.NOTIFS) {
                 LaunchedEffect(Unit) { vm.openNotifications() }
                 NotificationsScreen(notifs) { nav.popBackStack() }

@@ -117,6 +117,7 @@ dependencies {
     implementation(libs.agora.voice.sdk)
     implementation(libs.pusher.java.client)
     implementation(libs.recaptcha)
+    implementation(libs.play.services.auth.api.phone)
     implementation(libs.gson)
     implementation(libs.androidx.appcompat)
     coreLibraryDesugaring(libs.desugar.jdk.libs)

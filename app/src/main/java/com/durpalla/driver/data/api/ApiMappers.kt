@@ -88,20 +88,36 @@ object ApiMappers {
         "approved", "verified" -> DocStatus.VERIFIED
         "submitted", "pending", "under_review" -> DocStatus.UNDER_REVIEW
         "expiring" -> DocStatus.EXPIRING
+        "rejected", "cancelled", "canceled" -> DocStatus.REJECTED
         else -> DocStatus.MISSING
     }
 
     /** GET me + GET kyc → profile. */
     fun driver(me: JsonObject, kyc: JsonObject?): Driver {
-        val type = vehicleType(me.s("vehicleType"))
+        val type = vehicleType(me.s("vehicleType").ifBlank { kyc?.s("vehicleType").orEmpty() })
         val vehicle = me.o("vehicle")?.let { v -> Vehicle(v.s("title"), type, v.s("registrationNo"), v.i("capacity"), me.opt("kycComplete")?.asBoolean ?: false) }
-        val docs = kyc?.opt("documents")?.objects()?.map { d -> DocumentItem(docNames[d.s("type")] ?: d.s("type"), docStatus(d.s("status"))) }.orEmpty()
+        val docs = kyc?.opt("documents")?.objects()?.map { d ->
+            val t = d.s("type")
+            val path = d.s("viewPath").takeIf { it.isNotBlank() }
+                ?: "kyc/documents/$t".takeIf { d.opt("uploaded")?.asBoolean == true || d.s("status").isNotBlank() }
+            DocumentItem(
+                name = docNames[t] ?: t,
+                status = docStatus(d.s("status")),
+                type = t,
+                note = d.s("note"),
+                viewPath = path,
+            )
+        }.orEmpty()
+        val kycStatus = kyc?.s("status")?.takeIf { it.isNotBlank() } ?: me.s("kycStatus")
+        val avatar = me.s("avatarUrl").ifBlank { me.s("avatar") }.ifBlank { me.s("photo") }.ifBlank { null }
         return Driver(
             id = me.s("id"), name = me.s("name"), phone = me.s("phone"), rating = me.opt("rating")?.asDouble ?: 0.0, totalTrips = me.i("trips"), area = me.s("area"),
             vehicles = listOfNotNull(vehicle), documents = docs, kycComplete = me.opt("kycComplete")?.asBoolean ?: false,
+            kycStatus = kycStatus, kycNote = kyc?.s("note").orEmpty(),
             canBid = me.opt("canBid")?.asBoolean ?: false, online = me.opt("online")?.asBoolean ?: true,
             walletBalance = me.i("walletBalance"), hasWithdrawPin = me.opt("hasWithdrawPin")?.asBoolean ?: false,
             serviceStoppageCount = me.i("serviceStoppageCount"),
+            avatarUrl = avatar,
         )
     }
 
@@ -142,6 +158,7 @@ object ApiMappers {
             "bid.rejected" -> UiText.res(R.string.notif_rejected_title) to UiText.res(R.string.notif_rejected_body)
             "trip.cancelled" -> UiText.res(R.string.notif_cancelled_title) to UiText.res(R.string.notif_cancelled_body)
             "payment.received" -> UiText.res(R.string.notif_payment_title) to UiText.res(R.string.notif_payment_body, UiText.Taka(p.i("amount")))
+            "driver.welcome" -> UiText.res(R.string.notif_welcome_title) to UiText.res(R.string.notif_welcome_body)
             else -> UiText.Raw(o.s("event")) to UiText.Raw("")
         }
         val t = time(o.s("createdAt"))

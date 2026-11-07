@@ -70,7 +70,10 @@ fun ServiceAreaScreen(onBack: () -> Unit) {
                                 saving = true
                                 error = null
                                 ServiceLocator.profile.saveServiceStoppages(selected.toList().sorted())
-                                    .onSuccess { onBack() }
+                                    .onSuccess {
+                                        ServiceLocator.requests.refresh()
+                                        onBack()
+                                    }
                                     .onFailure { error = it.message }
                                 saving = false
                             }
