@@ -122,6 +122,10 @@ fi
 
 SIZE="$(du -h "$OUT" | cut -f1)"
 echo "Output: $OUT [$SIZE]"
+SYMS="app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip"
+if [[ -f "$SYMS" ]]; then
+  echo "Native symbols: $SYMS [$(du -h "$SYMS" | cut -f1)] (upload in Play Console if not embedded in AAB)"
+fi
 
 # Verify APK/AAB is signed (apksigner if available).
 if [[ "$OUT" == *.apk ]] && command -v apksigner >/dev/null; then

@@ -25,14 +25,14 @@ android {
         }
     }
     namespace = "com.durpalla.driver"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.durpalla.driver"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "0.1.1"
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("en", "bn")
         buildConfigField("String", "PUSHER_KEY", "\"${cfg("PUSHER_KEY")}\"")
@@ -71,6 +71,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Native crash symbols for Play Console (Agora / WebRTC / ML Kit .so).
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
             if (releaseStoreFile != null) {
                 signingConfig = signingConfigs.getByName("release")
             }

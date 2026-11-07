@@ -26,9 +26,11 @@
 -keep class com.google.firebase.** { *; }
 -dontwarn com.google.firebase.**
 
-# Pusher Java client
+# Pusher Java client (uses SLF4J; Android has no StaticLoggerBinder → NOP logger)
 -keep class com.pusher.** { *; }
 -dontwarn com.pusher.**
+-dontwarn org.slf4j.impl.StaticLoggerBinder
+-dontwarn org.slf4j.**
 
 # ML Kit face detection
 -keep class com.google.mlkit.** { *; }

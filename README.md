@@ -1,7 +1,7 @@
 # Durpalla Driver App (Android)
 
 Driver app for **Durpalla Limited**: Speedboat/Boat, Taxi and Microbus drivers in Bangladesh receive customer trip requests, bid a rent, and run confirmed trips.
-Kotlin · Jetpack Compose · Material 3 · Navigation Compose · MVVM (ViewModel + StateFlow) · minSdk 24 / target 35.
+Kotlin · Jetpack Compose · Material 3 · Navigation Compose · MVVM (ViewModel + StateFlow) · minSdk 24 / target 36.
 
 ## Setup
 1. Android Studio Ladybug (2024.2) or newer, JDK 17.
@@ -23,6 +23,7 @@ cp -n .env.example .env          # fill credentials once
 ```
 
 Output: `app/build/outputs/bundle/release/app-release.aab`  
+Native debug symbols (Play Console): `app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip`  
 (APK instead: `./scripts/run_release.sh` · install on device: add `--install`)
 
 ## Business rules (domain layer)
