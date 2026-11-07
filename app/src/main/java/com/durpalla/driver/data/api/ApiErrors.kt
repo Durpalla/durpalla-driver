@@ -12,6 +12,7 @@ object ApiErrors {
         "OTP_INVALID" -> UiText.res(R.string.err_otp)
         "OTP_EXPIRED" -> UiText.res(R.string.err_otp_expired)
         "AUTH_INVALID" -> UiText.res(R.string.err_password)
+        "PASSWORD_UNAVAILABLE" -> UiText.res(R.string.err_password_unavailable)
         "ACCOUNT_SUSPENDED" -> UiText.res(R.string.err_account_suspended)
         "RECAPTCHA_FAILED", "RECAPTCHA_REQUIRED", "RECAPTCHA_UNAVAILABLE" -> UiText.res(R.string.err_recaptcha)
         "KYC_REQUIRED" -> UiText.res(R.string.err_kyc_required)

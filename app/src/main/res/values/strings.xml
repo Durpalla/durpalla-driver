@@ -167,6 +167,7 @@
     <string name="log_in">Log in</string>
     <string name="err_password">Wrong phone or password.</string>
     <string name="err_password_short">Password must be at least 8 characters.</string>
+    <string name="err_password_unavailable">Password login is not set up on the server yet. Ask support to run the drivers.password migration.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>
     <string name="terms_prefix">"By continuing you agree to Durpalla\'s "</string>
     <string name="terms_driver">Driver Terms</string>

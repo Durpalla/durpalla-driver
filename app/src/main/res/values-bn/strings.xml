@@ -146,6 +146,7 @@
     <string name="log_in">লগ ইন</string>
     <string name="err_password">ফোন বা পাসওয়ার্ড ভুল।</string>
     <string name="err_password_short">পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।</string>
+    <string name="err_password_unavailable">সার্ভারে পাসওয়ার্ড লগ ইন এখনো চালু হয়নি। drivers.password মাইগ্রেশন চালাতে সাপোর্টকে বলুন।</string>
     <string name="err_password_mismatch">পাসওয়ার্ড দুটি মিলছে না।</string>
     <string name="terms_prefix">"এগিয়ে গেলে আপনি দূরপাল্লার "</string>
     <string name="terms_driver">ড্রাইভার শর্তাবলি</string>
