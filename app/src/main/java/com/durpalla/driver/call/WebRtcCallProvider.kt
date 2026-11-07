@@ -1,7 +1,9 @@
 package com.durpalla.driver.call
 
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import android.util.Log
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
@@ -136,7 +138,7 @@ class WebRtcCallProvider(
     }
 
     override fun setMuted(muted: Boolean) { track?.setEnabled(!muted); (_state.value as? CallState.Active)?.let { set(it.copy(muted = muted)) } }
-    override fun setSpeaker(on: Boolean) { audio.isSpeakerphoneOn = on; (_state.value as? CallState.Active)?.let { set(it.copy(speaker = on)) } }
+    override fun setSpeaker(on: Boolean) { setSpeakerphone(on); (_state.value as? CallState.Active)?.let { set(it.copy(speaker = on)) } }
     override fun onRemoteEnded(callId: String, status: CallStatus) { if (callId == this.callId) remoteStatus(status) }
     override fun dismissEnded() { if (_state.value is CallState.Ended) set(CallState.Idle) }
 
@@ -191,9 +193,25 @@ class WebRtcCallProvider(
         runCatching { track?.dispose() }; track = null
         runCatching { pc?.close(); pc?.dispose() }; pc = null
         remoteSet = false; pendingRemote.clear()
-        audio.mode = AudioManager.MODE_NORMAL; audio.isSpeakerphoneOn = false
+        audio.mode = AudioManager.MODE_NORMAL
+        setSpeakerphone(false)
         set(CallMachine.ended(_state.value, reason, System.currentTimeMillis(), error))
         callId = null
+    }
+
+    private fun setSpeakerphone(on: Boolean) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (on) {
+                val speaker = audio.availableCommunicationDevices
+                    .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                if (speaker != null) audio.setCommunicationDevice(speaker) else audio.clearCommunicationDevice()
+            } else {
+                audio.clearCommunicationDevice()
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            audio.isSpeakerphoneOn = on
+        }
     }
 
     private fun addRemote(c: IceCandidateDto) {

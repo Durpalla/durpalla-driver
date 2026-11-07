@@ -37,8 +37,9 @@ object SdpMunger {
             if (l.startsWith("m=")) {
                 if (inAudio) closeAudio()
                 inAudio = l.startsWith("m=audio"); opus = if (inAudio) opusByLine[i] else null; wroteFmtp = false; hadPtime = false
-                if (inAudio && opus != null) {
-                    val p = l.split(" "); out += (p.take(3) + opus!!).joinToString(" "); return@forEachIndexed
+                val opusPt = opus
+                if (inAudio && opusPt != null) {
+                    val p = l.split(" "); out += (p.take(3) + opusPt).joinToString(" "); return@forEachIndexed
                 }
             }
             val pt = opus

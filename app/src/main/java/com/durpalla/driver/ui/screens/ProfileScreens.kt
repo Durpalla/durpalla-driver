@@ -247,13 +247,14 @@ fun VehiclesScreen(d: Driver, onBack: () -> Unit, onReupload: () -> Unit = {}) {
                                 DocStatus.REJECTED, DocStatus.MISSING -> Tone.DANGER
                             },
                         )
-                        if (!doc.viewPath.isNullOrBlank() && doc.status != DocStatus.MISSING) {
+                        val viewPath = doc.viewPath
+                        if (!viewPath.isNullOrBlank() && doc.status != DocStatus.MISSING) {
                             TextButton(
                                 onClick = {
                                     if (opening) return@TextButton
                                     opening = true
                                     scope.launch {
-                                        KycDocumentViewer.open(context, ServiceLocator.api, doc.viewPath!!)
+                                        KycDocumentViewer.open(context, ServiceLocator.api, viewPath)
                                             .onSuccess { if (it.bitmap != null) preview = it.bitmap }
                                             .onFailure {
                                                 Toast.makeText(context, context.getString(R.string.doc_open_failed), Toast.LENGTH_SHORT).show()

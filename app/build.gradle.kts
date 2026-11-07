@@ -68,7 +68,8 @@ android {
         debug { apiFields(this, "https://dev-apigw.durpalla.com") }
         release {
             apiFields(this, "https://apigw.durpalla.com")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (releaseStoreFile != null) {
                 signingConfig = signingConfigs.getByName("release")

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -86,7 +87,7 @@ fun EarningsScreen(s: EarningsSummary, onWithdraw: () -> Unit, onWallet: () -> U
                 Box(Modifier.weight(1f)) { StatTile(stringResource(R.string.rating), str(R.string.rating_star, num(rating)), valueColor = DP.Accent) }
             }
             DCard {
-                MenuRow(Icons.Filled.ReceiptLong, stringResource(R.string.recon_menu), stringResource(R.string.recon_menu_sub), onClick = onRecon)
+                MenuRow(Icons.AutoMirrored.Filled.ReceiptLong, stringResource(R.string.recon_menu), stringResource(R.string.recon_menu_sub), onClick = onRecon)
                 MenuRow(Icons.Filled.Star, stringResource(R.string.ratings_reviews), onClick = onRatings)
             }
         }

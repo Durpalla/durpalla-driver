@@ -5,13 +5,25 @@ Kotlin · Jetpack Compose · Material 3 · Navigation Compose · MVVM (ViewModel
 
 ## Setup
 1. Android Studio Ladybug (2024.2) or newer, JDK 17.
-2. Open this folder → let Gradle sync (AGP 8.7.3, Kotlin 2.0.21, Gradle 8.10.2 wrapper).
+2. Open this folder → let Gradle sync (AGP 8.7.3, Kotlin 2.4.21, Gradle 8.14.4 wrapper).
 3. Run the `app` configuration, or from CLI:
    ```
    ./gradlew assembleDebug          # app/build/outputs/apk/debug/app-debug.apk
    ./gradlew testDebugUnitTest      # slot-lock / bid / commission rules
    ```
 Demo login: any 11-digit number, any 6-digit OTP. KYC needs 3+ documents "uploaded" (tap to toggle).
+
+## Release (Play Store AAB)
+Uses `.env` for API / Pusher / reCAPTCHA and signing (`STORE_*`). Bump `versionCode` / `versionName` in `app/build.gradle.kts` first.
+
+```bash
+cp -n .env.example .env          # fill credentials once
+./scripts/generate_keystore.sh   # once — writes keystore + STORE_* into .env
+./scripts/run_release.sh --bundle
+```
+
+Output: `app/build/outputs/bundle/release/app-release.aab`  
+(APK instead: `./scripts/run_release.sh` · install on device: add `--install`)
 
 ## Business rules (domain layer)
 - Customer opens a trip request (vehicle, route, slot, passengers) → nearby drivers are notified → drivers bid → customer picks one.

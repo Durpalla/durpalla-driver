@@ -84,8 +84,7 @@ class ApiAuthRepository(
         val body = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM)
             .addFormDataPart("file", "$docType.jpg", bytes.toRequestBody(mime.toMediaTypeOrNull()))
             .build()
-        api.post("kyc/documents/$docType", body).getOrThrow()
-        Unit
+        api.post("kyc/documents/$docType", body).map { }.getOrThrow()
     }
 
     /** POST kyc: vehicleType + optional leftover multipart files; uses already-uploaded docs. */
@@ -96,8 +95,7 @@ class ApiAuthRepository(
             if (bytes.isEmpty()) return@forEach
             body.addFormDataPart("documents[$docType]", "$docType.jpg", bytes.toRequestBody(mime.toMediaTypeOrNull()))
         }
-        api.post("kyc", body.build()).getOrThrow()
-        Unit
+        api.post("kyc", body.build()).map { }.getOrThrow()
     }
 
     override suspend fun logout(): Result<Unit> {

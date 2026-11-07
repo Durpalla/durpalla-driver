@@ -38,7 +38,12 @@ fun SmsOtpUserConsent(restartKey: Int = 0, onCode: (String) -> Unit) {
             override fun onReceive(ctx: Context, intent: Intent) {
                 if (SmsRetriever.SMS_RETRIEVED_ACTION != intent.action) return
                 val extras = intent.extras ?: return
-                val status = extras.get(SmsRetriever.EXTRA_STATUS) as? Status ?: return
+                val status = if (Build.VERSION.SDK_INT >= 33) {
+                    extras.getParcelable(SmsRetriever.EXTRA_STATUS, Status::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    extras.getParcelable(SmsRetriever.EXTRA_STATUS) as? Status
+                } ?: return
                 when (status.statusCode) {
                     CommonStatusCodes.SUCCESS -> {
                         val consent = if (Build.VERSION.SDK_INT >= 33) {

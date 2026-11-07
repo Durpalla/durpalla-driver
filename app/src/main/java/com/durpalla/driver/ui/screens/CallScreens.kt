@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,7 +89,7 @@ fun CallScreen(
                 is CallState.Active -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         RoundAction(if (s.muted) Icons.Filled.MicOff else Icons.Filled.Mic, stringResource(if (s.muted) R.string.call_unmute else R.string.call_mute), Color.White.copy(alpha = .2f), { onMute(!s.muted) })
-                        RoundAction(Icons.Filled.VolumeUp, stringResource(if (s.speaker) R.string.call_speaker_off else R.string.call_speaker), if (s.speaker) DP.Accent else Color.White.copy(alpha = .2f), { onSpeaker(!s.speaker) })
+                        RoundAction(Icons.AutoMirrored.Filled.VolumeUp, stringResource(if (s.speaker) R.string.call_speaker_off else R.string.call_speaker), if (s.speaker) DP.Accent else Color.White.copy(alpha = .2f), { onSpeaker(!s.speaker) })
                     }
                     Spacer(Modifier.height(24.dp))
                     RoundAction(Icons.Filled.CallEnd, stringResource(R.string.call_end), DP.Danger, onHangUp)

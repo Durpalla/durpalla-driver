@@ -174,13 +174,11 @@ fun BiometricSetupScreen(
     val subtitle = stringResource(R.string.biometric_prompt_enable_sub)
     val cancel = stringResource(R.string.cancel)
     val host = activity
-    val showEnable = available && canEnable && host != null
-
     Scaffold(
         topBar = { DTopBar(stringResource(R.string.biometric_setup_title)) },
         bottomBar = {
             StickyCta {
-                if (showEnable && host != null) {
+                if (available && canEnable && host != null) {
                     PrimaryButton(
                         stringResource(R.string.biometric_enable),
                         onClick = {
