@@ -181,6 +181,12 @@ fun AvatarCameraScreen(onDone: () -> Unit, onBack: () -> Unit) {
                                 }
                             }
                             try {
+                                // Match JPEG EXIF / buffer rotation to the display so selfies are upright.
+                                val rotation = previewView.display?.rotation
+                                    ?: android.view.Surface.ROTATION_0
+                                preview.targetRotation = rotation
+                                imageCapture.targetRotation = rotation
+                                analysis.targetRotation = rotation
                                 provider.unbindAll()
                                 provider.bindToLifecycle(
                                     lifecycle,

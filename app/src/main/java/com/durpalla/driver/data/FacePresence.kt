@@ -2,7 +2,6 @@ package com.durpalla.driver.data
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -32,8 +31,8 @@ object FacePresence {
     }
 
     suspend fun checkUri(context: Context, uri: Uri): Result {
-        val bmp = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-            ?: return Result.NoFace
+        // Same EXIF orientation as AvatarCrop so face checks match the upright selfie.
+        val bmp = AvatarCrop.decodeOriented(context, uri) ?: return Result.NoFace
         return try {
             checkBitmap(bmp)
         } finally {
