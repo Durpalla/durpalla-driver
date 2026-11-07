@@ -33,22 +33,29 @@ object DeepLink {
 }
 
 object Channels {
-    const val TRIP_REQUESTS = "trip_requests"; const val BIDS = "bids"; const val PAYMENTS = "payments"; const val GENERAL = "general"
+    /** v2 uses custom trip_request_alert raw sound (channel id change required for Android). */
+    const val TRIP_REQUESTS = "trip_requests_v2"
+    const val BIDS = "bids"
+    const val PAYMENTS = "payments"
+    const val GENERAL = "general"
 
     fun create(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val tripSound = android.net.Uri.parse("android.resource://${ctx.packageName}/${R.raw.trip_request_alert}")
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         // Names/descriptions follow the app language; re-creating with the same id just renames the channel.
         val c = L10n.localized(ctx)
         nm.createNotificationChannels(listOf(
             NotificationChannel(TRIP_REQUESTS, c.getString(R.string.ch_trip_requests), NotificationManager.IMPORTANCE_HIGH).apply {
-                description = c.getString(R.string.ch_trip_requests_desc); enableVibration(true); setSound(sound, attrs)
+                description = c.getString(R.string.ch_trip_requests_desc); enableVibration(true); setSound(tripSound, attrs)
             },
             NotificationChannel(BIDS, c.getString(R.string.ch_bids), NotificationManager.IMPORTANCE_HIGH).apply { description = c.getString(R.string.ch_bids_desc) },
             NotificationChannel(PAYMENTS, c.getString(R.string.ch_payments), NotificationManager.IMPORTANCE_DEFAULT).apply { description = c.getString(R.string.ch_payments_desc) },
-            NotificationChannel(GENERAL, c.getString(R.string.ch_general), NotificationManager.IMPORTANCE_LOW).apply { description = c.getString(R.string.ch_general_desc) },
+            NotificationChannel(GENERAL, c.getString(R.string.ch_general), NotificationManager.IMPORTANCE_LOW).apply {
+                description = c.getString(R.string.ch_general_desc); setSound(defaultSound, attrs)
+            },
         ))
     }
 }
@@ -80,7 +87,8 @@ object Notifier {
             putExtra(DeepLink.EXTRA, spec.route)
         }
         val pi = PendingIntent.getActivity(ctx, spec.route.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(ctx, spec.channel)
+        val channel = if (spec.channel == "trip_requests") Channels.TRIP_REQUESTS else spec.channel
+        val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_durpalla).setColor(0xFF0E5F7E.toInt())
             .setContentTitle(spec.title.resolve(ctx)).setContentText(spec.body.resolve(ctx)).setStyle(NotificationCompat.BigTextStyle().bigText(spec.body.resolve(ctx)))
             .setAutoCancel(true).setContentIntent(pi)

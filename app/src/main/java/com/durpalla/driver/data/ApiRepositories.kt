@@ -238,6 +238,19 @@ class ApiProfileRepository(private val api: ApiClient, private val trips: TripRe
         _notifications.update { l -> l.map { it.copy(unread = false) } }
     }
 
+    override suspend fun loadServiceStoppages(): Result<List<ServiceStoppage>> = api.get("service-stoppages").map { d ->
+        d.asJsonObject.get("stoppages")?.objects().orEmpty().map(ApiMappers::serviceStoppage)
+    }
+
+    override suspend fun saveServiceStoppages(ids: List<Int>): Result<List<ServiceStoppage>> =
+        api.put("service-stoppages", mapOf("stoppage_ids" to ids)).map { d ->
+            val body = d.asJsonObject
+            val list = body.get("stoppages")?.objects().orEmpty().map(ApiMappers::serviceStoppage)
+            val count = body.get("selectedIds")?.asJsonArray?.size() ?: list.count { it.selected }
+            _driver.value = _driver.value.copy(serviceStoppageCount = count)
+            list
+        }
+
     override fun clear() { _driver.value = Driver.Empty; _ratings.value = emptyList(); _notifications.value = emptyList() }
 }
 

@@ -85,6 +85,10 @@
         <item quantity="one">%1$s vehicle</item>
         <item quantity="other">%1$s vehicles</item>
     </plurals>
+    <plurals name="ghats_count">
+        <item quantity="one">%1$s ghat</item>
+        <item quantity="other">%1$s ghats</item>
+    </plurals>
     <plurals name="withdrawals_count">
         <item quantity="one">Paid out (%1$s withdrawal)</item>
         <item quantity="other">Paid out (%1$s withdrawals)</item>
@@ -378,6 +382,12 @@
     <string name="profile">Profile</string>
     <string name="trips_verified">" · %1$s · Verified"</string>
     <string name="vehicles_docs">Vehicles &amp; documents</string>
+    <string name="service_area">Service area</string>
+    <string name="service_area_hint">Select the ghats you serve. You only receive trip requests that include one of these stops.</string>
+    <string name="service_area_empty">Set ghats to get requests</string>
+    <string name="service_area_home_hint">Set your service area (ghats) in Profile to receive nearby trip requests.</string>
+    <string name="save_service_area">Save service area</string>
+    <string name="saving">Saving…</string>
     <string name="availability_calendar">Availability calendar</string>
     <string name="wallet_payout">Wallet &amp; payout methods</string>
     <string name="help_support">Help &amp; support</string>

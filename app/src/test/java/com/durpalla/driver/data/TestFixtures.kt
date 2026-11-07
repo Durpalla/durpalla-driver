@@ -233,6 +233,8 @@ class FakeProfileRepository : ProfileRepository {
     override suspend fun setOnline(online: Boolean) = Result.success((driver as MutableStateFlow).update { it.copy(online = online) })
     override suspend fun refreshNotifications() = Result.success(Unit)
     override suspend fun markNotificationsRead() = Result.success((notifications as MutableStateFlow).update { l -> l.map { it.copy(unread = false) } })
+    override suspend fun loadServiceStoppages() = Result.success(emptyList<ServiceStoppage>())
+    override suspend fun saveServiceStoppages(ids: List<Int>) = Result.success(emptyList<ServiceStoppage>())
     override fun clear() {}
 }
 

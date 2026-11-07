@@ -27,7 +27,7 @@ import com.durpalla.driver.ui.components.*
 import com.durpalla.driver.ui.theme.DP
 
 @Composable
-fun ProfileScreen(d: Driver, onVehicles: () -> Unit, onRatings: () -> Unit, onHistory: () -> Unit, onPredefined: () -> Unit, onCalendar: () -> Unit, onWallet: () -> Unit, onSupport: () -> Unit, onNotifications: () -> Unit, onLogout: () -> Unit, onLanguage: () -> Unit = {}) {
+fun ProfileScreen(d: Driver, onVehicles: () -> Unit, onRatings: () -> Unit, onHistory: () -> Unit, onPredefined: () -> Unit, onCalendar: () -> Unit, onWallet: () -> Unit, onSupport: () -> Unit, onNotifications: () -> Unit, onLogout: () -> Unit, onLanguage: () -> Unit = {}, onServiceArea: () -> Unit = {}) {
     Scaffold(topBar = { DTopBar(stringResource(R.string.profile)) }) { pad ->
         ScreenColumn(pad) {
             DCard {
@@ -41,6 +41,9 @@ fun ProfileScreen(d: Driver, onVehicles: () -> Unit, onRatings: () -> Unit, onHi
             }
             DCard {
                 MenuRow(Icons.Filled.DirectionsBoat, stringResource(R.string.vehicles_docs), plural(R.plurals.vehicles_count, d.vehicles.size), onClick = onVehicles)
+                MenuRow(Icons.Filled.Place, stringResource(R.string.service_area),
+                    if (d.serviceStoppageCount > 0) plural(R.plurals.ghats_count, d.serviceStoppageCount) else stringResource(R.string.service_area_empty),
+                    onClick = onServiceArea)
                 MenuRow(Icons.Filled.Route, stringResource(R.string.predef_title), onClick = onPredefined)
                 MenuRow(Icons.Filled.CalendarMonth, stringResource(R.string.availability_calendar), onClick = onCalendar)
                 MenuRow(Icons.Filled.History, stringResource(R.string.trip_history), onClick = onHistory)

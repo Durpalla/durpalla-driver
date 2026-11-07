@@ -101,8 +101,16 @@ object ApiMappers {
             vehicles = listOfNotNull(vehicle), documents = docs, kycComplete = me.opt("kycComplete")?.asBoolean ?: false,
             canBid = me.opt("canBid")?.asBoolean ?: false, online = me.opt("online")?.asBoolean ?: true,
             walletBalance = me.i("walletBalance"), hasWithdrawPin = me.opt("hasWithdrawPin")?.asBoolean ?: false,
+            serviceStoppageCount = me.i("serviceStoppageCount"),
         )
     }
+
+    fun serviceStoppage(o: JsonObject): ServiceStoppage = ServiceStoppage(
+        id = o.i("id"),
+        name = o.s("name"),
+        cityName = o.s("cityName"),
+        selected = o.opt("selected")?.asBoolean ?: false,
+    )
 
     fun rating(o: JsonObject): Rating =
         Rating(o.s("customerName"), o.i("stars"), o.s("comment"), date(o.s("createdAt")), o.s("tripCode", "#" + o.s("tripId")))

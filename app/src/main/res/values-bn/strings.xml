@@ -66,6 +66,10 @@
         <item quantity="one">%1$sটি যানবাহন</item>
         <item quantity="other">%1$sটি যানবাহন</item>
     </plurals>
+    <plurals name="ghats_count">
+        <item quantity="one">%1$sটি ঘাট</item>
+        <item quantity="other">%1$sটি ঘাট</item>
+    </plurals>
     <plurals name="withdrawals_count">
         <item quantity="one">পরিশোধিত (%1$s বার উত্তোলন)</item>
         <item quantity="other">পরিশোধিত (%1$s বার উত্তোলন)</item>
@@ -349,6 +353,12 @@
     <string name="profile">প্রোফাইল</string>
     <string name="trips_verified">" · %1$s · যাচাইকৃত"</string>
     <string name="vehicles_docs">যানবাহন ও কাগজপত্র</string>
+    <string name="service_area">সার্ভিস এলাকা</string>
+    <string name="service_area_hint">আপনি যে ঘাটগুলোতে সেবা দেন সেগুলো বেছে নিন। শুধু সেই ঘাটসহ রিকোয়েস্টে নোটিফিকেশন পাবেন।</string>
+    <string name="service_area_empty">রিকোয়েস্ট পেতে ঘাট সেট করুন</string>
+    <string name="service_area_home_hint">কাছের ট্রিপ রিকোয়েস্ট পেতে প্রোফাইল থেকে সার্ভিস এলাকা (ঘাট) সেট করুন।</string>
+    <string name="save_service_area">সার্ভিস এলাকা সেভ করুন</string>
+    <string name="saving">সেভ হচ্ছে…</string>
     <string name="availability_calendar">সময়সূচি ক্যালেন্ডার</string>
     <string name="wallet_payout">ওয়ালেট ও পেমেন্ট মাধ্যম</string>
     <string name="help_support">সাহায্য ও সহায়তা</string>

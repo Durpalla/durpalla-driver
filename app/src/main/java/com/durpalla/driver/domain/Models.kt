@@ -102,12 +102,20 @@ data class Driver(
     val online: Boolean = true,
     val walletBalance: Int = 0,
     val hasWithdrawPin: Boolean = false,
+    val serviceStoppageCount: Int = 0,
 ) {
     companion object {
         /** Before GET me has loaded (not sample data: every field is blank). */
         val Empty = Driver("", "", 0.0, 0, "", emptyList(), emptyList())
     }
 }
+
+data class ServiceStoppage(
+    val id: Int,
+    val name: String,
+    val cityName: String = "",
+    val selected: Boolean = false,
+)
 
 enum class TxType { EARNING, COMMISSION, WITHDRAWAL, ADJUSTMENT }
 data class WalletTx(val id: String, val title: String, val date: LocalDate, val amount: Int, val type: TxType)

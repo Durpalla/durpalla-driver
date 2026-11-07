@@ -79,7 +79,8 @@ fun HomeScreen(
                 }
             }
             SectionHeader(stringResource(R.string.new_requests), stringResource(R.string.see_all), onSeeAll)
-            if (!online) EmptyState(stringResource(R.string.youre_offline))
+            if (driver.serviceStoppageCount <= 0) EmptyState(stringResource(R.string.service_area_home_hint))
+            else if (!online) EmptyState(stringResource(R.string.youre_offline))
             else requests.take(3).forEach { r -> RequestCard(r, isBlocked(r), onClick = { onRequest(r) }, onSkip = { onSkip(r) }) }
         }
     }

@@ -73,5 +73,7 @@ interface ProfileRepository {
     suspend fun setOnline(online: Boolean): Result<Unit>
     suspend fun refreshNotifications(): Result<Unit>
     suspend fun markNotificationsRead(): Result<Unit>
+    suspend fun loadServiceStoppages(): Result<List<ServiceStoppage>>
+    suspend fun saveServiceStoppages(ids: List<Int>): Result<List<ServiceStoppage>>
     fun clear()
 }
