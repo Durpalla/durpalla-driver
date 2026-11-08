@@ -3,9 +3,16 @@ package com.durpalla.driver.domain
 import com.durpalla.driver.R
 import com.durpalla.driver.i18n.UiText
 
-/** Durpalla platform commission. */
+/** Durpalla platform commission on RFQ/bid wins (admin Options `bid_commission_percent`). */
 object Commission {
-    const val RATE_PERCENT = 10
+    @Volatile
+    var RATE_PERCENT: Int = 10
+        private set
+
+    fun updateRate(percent: Int) {
+        RATE_PERCENT = percent.coerceIn(0, 100)
+    }
+
     fun of(amount: Int): Int = Math.round(amount * RATE_PERCENT / 100.0).toInt()
     fun netOf(amount: Int): Int = amount - of(amount)
 }

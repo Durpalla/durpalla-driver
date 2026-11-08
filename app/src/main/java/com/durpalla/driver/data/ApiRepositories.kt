@@ -350,6 +350,9 @@ object EarningsCalc {
         val weekTotal = weekTrips.sumOf(::net)
         val prevTotal = prevWeek.flatMap(::on).sumOf(::net)
         val i = { k: String -> api.get(k)?.takeUnless { it.isJsonNull }?.asInt ?: 0 }
+        val pct = api.get("commissionPercent")?.takeUnless { it.isJsonNull }?.asDouble?.toInt()
+            ?: Commission.RATE_PERCENT
+        Commission.updateRate(pct)
         return EarningsSummary(
             walletBalance = i("balance"), pendingSettlement = i("pendingWithdrawals"),
             nextPayout = api.get("nextPayout")?.takeUnless { it.isJsonNull }?.asString?.let { runCatching { LocalDate.parse(it).format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.ENGLISH)) }.getOrNull() }.orEmpty(),
@@ -357,6 +360,7 @@ object EarningsCalc {
             daily = week.map { d -> dayLabels[d.dayOfWeek.value - 1] to on(d).sumOf(::net) },
             weekTotal = weekTotal, weekChangePct = if (prevTotal > 0) ((weekTotal - prevTotal) * 100 / prevTotal) else 0,
             weekTrips = weekTrips.size, weekCommission = weekTrips.sumOf { it.commission },
+            commissionPercent = pct,
         )
     }
 

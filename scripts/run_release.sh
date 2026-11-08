@@ -50,7 +50,16 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   export "$key=$val"
 done < "$ENV_FILE"
 
-SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+# macOS default is ~/Library/Android/sdk; Linux often ~/Android/Sdk
+if [[ -n "${ANDROID_HOME:-}" && -d "$ANDROID_HOME" ]]; then
+  SDK_DIR="$ANDROID_HOME"
+elif [[ -n "${ANDROID_SDK_ROOT:-}" && -d "$ANDROID_SDK_ROOT" ]]; then
+  SDK_DIR="$ANDROID_SDK_ROOT"
+elif [[ -d "$HOME/Library/Android/sdk" ]]; then
+  SDK_DIR="$HOME/Library/Android/sdk"
+else
+  SDK_DIR="$HOME/Android/Sdk"
+fi
 if [[ ! -d "$SDK_DIR" ]]; then
   echo "Android SDK not found at $SDK_DIR (set ANDROID_HOME)." >&2
   exit 1

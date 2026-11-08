@@ -129,13 +129,15 @@ fun Countdown(totalSec: Int, onExpire: () -> Unit = {}) {
 @Composable
 fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, onSkip: () -> Unit, onBid: () -> Unit, onConflict: () -> Unit,
     live: LiveBid? = null, connection: ConnectionState = ConnectionState.LIVE) {
+    var showCommissionAlert by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         topBar = { DTopBar(stringResource(R.string.trip_request), onBack) },
         bottomBar = {
             StickyCta {
                 if (conflict != null) PrimaryButton(stringResource(R.string.slot_booked_why), onConflict, enabled = true)
                 else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SecondaryButton(stringResource(R.string.skip), onSkip, Modifier.weight(1f)); PrimaryButton(stringResource(R.string.place_bid), onBid, Modifier.weight(1.4f), accent = true)
+                    SecondaryButton(stringResource(R.string.skip), onSkip, Modifier.weight(1f))
+                    PrimaryButton(stringResource(R.string.place_bid), { showCommissionAlert = true }, Modifier.weight(1.4f), accent = true)
                 }
             }
         },
@@ -163,6 +165,23 @@ fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, o
                 Text(str(R.string.conflict_note, conflict.code, conflict.slot.timeLabel()), color = DP.Danger)
             }
         }
+    }
+    if (showCommissionAlert) {
+        AlertDialog(
+            onDismissRequest = { showCommissionAlert = false },
+            title = { Text(stringResource(R.string.bid_commission_alert_title)) },
+            text = { Text(str(R.string.bid_commission_alert_body, Commission.RATE_PERCENT)) },
+            confirmButton = {
+                TextButton(onClick = { showCommissionAlert = false; onBid() }) {
+                    Text(stringResource(R.string.continue_label))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCommissionAlert = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }
 

@@ -47,6 +47,8 @@
     <string name="commission">Commission</string>
     <string name="commission_pct">Commission (%1$s%%)</string>
     <string name="durpalla_commission_pct">Durpalla commission (%1$s%%)</string>
+    <string name="bid_commission_alert_title">Bid commission notice</string>
+    <string name="bid_commission_alert_body">Joining this bid applies a %1$s%% Durpalla commission on the winning fare.\n\nThis bid commission is separate from any merchant partnership agreement rate. Agreement commission applies only when a customer books your boat or trip directly.</string>
     <string name="agreed_rent">Agreed rent</string>
     <string name="rent">Rent</string>
     <string name="map_preview">Map preview</string>

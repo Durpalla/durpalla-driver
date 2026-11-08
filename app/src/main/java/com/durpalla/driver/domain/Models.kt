@@ -185,6 +185,7 @@ data class EarningsSummary(
     val weekChangePct: Int,
     val weekTrips: Int,
     val weekCommission: Int,
+    val commissionPercent: Int = Commission.RATE_PERCENT,
 ) {
     companion object { val Empty = EarningsSummary(0, 0, "", 0, 0, emptyList(), 0, 0, 0, 0) }
 }

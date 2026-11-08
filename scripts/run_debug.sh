@@ -35,8 +35,21 @@ for arg in "$@"; do
   esac
 done
 
+# macOS default is ~/Library/Android/sdk; Linux often ~/Android/Sdk
+resolve_sdk_dir() {
+  if [[ -n "${ANDROID_HOME:-}" && -d "$ANDROID_HOME" ]]; then
+    echo "$ANDROID_HOME"
+  elif [[ -n "${ANDROID_SDK_ROOT:-}" && -d "$ANDROID_SDK_ROOT" ]]; then
+    echo "$ANDROID_SDK_ROOT"
+  elif [[ -d "$HOME/Library/Android/sdk" ]]; then
+    echo "$HOME/Library/Android/sdk"
+  else
+    echo "$HOME/Android/Sdk"
+  fi
+}
+
 if ! command -v adb >/dev/null; then
-  SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+  SDK_DIR="$(resolve_sdk_dir)"
   export PATH="${SDK_DIR}/platform-tools:${PATH}"
 fi
 
@@ -111,7 +124,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   export "$key=$val"
 done < "$ENV_FILE"
 
-SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+SDK_DIR="$(resolve_sdk_dir)"
 if [[ ! -d "$SDK_DIR" ]]; then
   echo "Android SDK not found at $SDK_DIR (set ANDROID_HOME)." >&2
   exit 1

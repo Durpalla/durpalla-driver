@@ -28,6 +28,8 @@
     <string name="commission">কমিশন</string>
     <string name="commission_pct">কমিশন (%1$s%%)</string>
     <string name="durpalla_commission_pct">দূরপাল্লা কমিশন (%1$s%%)</string>
+    <string name="bid_commission_alert_title">বিড কমিশন নোটিশ</string>
+    <string name="bid_commission_alert_body">এই বিডে যোগ দিলে জয়ী ভাড়ার উপর দূরপাল্লার %1$s%% কমিশন প্রযোজ্য হবে।\n\nএই বিড কমিশন মার্চেন্ট পার্টনারশিপ চুক্তির হার থেকে আলাদা। চুক্তির কমিশন শুধু তখন প্রযোজ্য যখন গ্রাহক সরাসরি আপনার নৌকা বা ট্রিপ বুক করেন।</string>
     <string name="agreed_rent">নির্ধারিত ভাড়া</string>
     <string name="rent">ভাড়া</string>
     <string name="map_preview">ম্যাপ প্রিভিউ</string>
