@@ -31,8 +31,8 @@ android {
         applicationId = "com.durpalla.driver"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("en", "bn")
         buildConfigField("String", "PUSHER_KEY", "\"${cfg("PUSHER_KEY")}\"")
