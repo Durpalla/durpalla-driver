@@ -50,8 +50,8 @@ object SampleData {
     val driver = Driver(
         "Rafiqul Islam", "+880 1711-234567", 4.8, 312, "Sadarghat, Dhaka",
         listOf(
-            Vehicle("MV Sonar Tori", VehicleType.SPEEDBOAT, "DHK-SB-1043", 12, true),
-            Vehicle("Toyota Hiace", VehicleType.MICROBUS, "DHAKA METRO-CHA 15-2231", 11, false),
+            Vehicle("1", "MV Sonar Tori", VehicleType.SPEEDBOAT, "DHK-SB-1043", 12, true, true),
+            Vehicle("2", "Toyota Hiace", VehicleType.MICROBUS, "DHAKA METRO-CHA 15-2231", 11, false),
         ),
         listOf(
             DocumentItem("National ID (NID)", DocStatus.VERIFIED),
@@ -150,7 +150,7 @@ class FakeRequestRepository(
     )
     override val bids: StateFlow<List<Bid>> = _bids
 
-    override suspend fun placeBid(requestId: String, amount: Int, note: String): Result<Bid> {
+    override suspend fun placeBid(requestId: String, amount: Int, note: String, boatId: String?): Result<Bid> {
         delay(300)
         val req = _requests.value.firstOrNull { it.id == requestId } ?: return Result.failure(UserFacingException(UiText.res(R.string.err_request_gone)))
         return when (val v = BidRules.validate(amount, req, tripRepo.trips.value, policy)) {
@@ -241,6 +241,10 @@ class FakeProfileRepository : ProfileRepository {
     override suspend fun markNotificationsRead() = Result.success((notifications as MutableStateFlow).update { l -> l.map { it.copy(unread = false) } })
     override suspend fun loadServiceStoppages() = Result.success(emptyList<ServiceStoppage>())
     override suspend fun saveServiceStoppages(ids: List<Int>) = Result.success(emptyList<ServiceStoppage>())
+    override suspend fun updateName(name: String) = Result.success(SampleData.driver.copy(name = name))
+    override suspend fun uploadAvatarJpeg(bytes: ByteArray) = Result.success(SampleData.driver)
+    override suspend fun registerVehicle(title: String, registrationNo: String, capacity: Int, vehicleType: VehicleType) =
+        Result.success(SampleData.driver.copy(vehicles = SampleData.driver.vehicles + Vehicle("n", title, vehicleType, registrationNo, capacity, false, true)))
     override fun clear() {}
 }
 

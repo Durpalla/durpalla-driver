@@ -171,9 +171,14 @@ class ApiRequestRepository(private val api: ApiClient, private val trips: TripRe
         _requests.value = feed.filterNot { it.id in skipped }
     }
 
-    override suspend fun placeBid(requestId: String, amount: Int, note: String): Result<Bid> {
+    override suspend fun placeBid(requestId: String, amount: Int, note: String, boatId: String?): Result<Bid> {
         val req = _requests.value.firstOrNull { it.id == requestId }
-        return api.post("requests/$requestId/bids", mapOf("amount" to amount, "note" to note.ifBlank { null })).mapCatching { d ->
+        val body = buildMap<String, Any?> {
+            put("amount", amount)
+            put("note", note.ifBlank { null })
+            if (!boatId.isNullOrBlank()) put("boatId", boatId.toIntOrNull() ?: boatId)
+        }
+        return api.post("requests/$requestId/bids", body).mapCatching { d ->
             val bid = ApiMappers.bid(d.asJsonObject, req) ?: throw UserFacingException(UiText.res(R.string.err_request_gone))
             _bids.update { l -> listOf(bid) + l.filterNot { it.id == bid.id } }
             _requests.update { l -> l.map { if (it.id == requestId) it.copy(status = RequestStatus.BIDDING, bidsCount = it.bidsCount + 1) else it } }
@@ -295,6 +300,20 @@ class ApiProfileRepository(private val api: ApiClient, private val trips: TripRe
         api.patch("me", mapOf("name" to name.trim())).mapCatching { d ->
             val before = _driver.value
             ApiMappers.driver(d.asJsonObject, null).copy(documents = before.documents).also { _driver.value = it }
+        }
+
+    override suspend fun registerVehicle(title: String, registrationNo: String, capacity: Int, vehicleType: VehicleType): Result<Driver> =
+        api.post(
+            "vehicles",
+            mapOf(
+                "title" to title.trim(),
+                "registrationNo" to registrationNo.trim().ifBlank { null },
+                "capacity" to capacity,
+                "vehicleType" to vehicleType.name,
+            ),
+        ).mapCatching {
+            refresh().getOrThrow()
+            _driver.value
         }
 
     override suspend fun uploadAvatarJpeg(bytes: ByteArray): Result<Driver> = runCatching {

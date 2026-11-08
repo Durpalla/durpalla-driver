@@ -50,7 +50,7 @@ object Routes {
     const val PREDEF = "predefined"; const val PREDEF_FORM = "predefined/edit?id={id}"; const val CALENDAR = "availability"
     const val HISTORY = "history"; const val RATINGS = "ratings"; const val WITHDRAW = "withdraw"; const val WITHDRAW_OK = "withdraw/ok"
     const val RECON = "reconciliation"; const val WALLET = "wallet"; const val NOTIFS = "notifications"; const val VEHICLES = "vehicles"; const val SUPPORT = "support"
-    const val SERVICE_AREA = "service-area"
+    const val SERVICE_AREA = "service-area"; const val ADD_VEHICLE = "vehicles/add"
     fun incoming(id: String) = "request/$id"; fun bid(id: String) = "request/$id/bid"; fun conflict(id: String) = "request/$id/conflict"
     fun won(t: String) = "won/$t"; fun trip(t: String) = "trip/$t"; fun live(t: String) = "trip/$t/live"; fun collect(t: String) = "trip/$t/collect"; fun done(t: String) = "trip/$t/done"
     fun predefForm(id: String?) = "predefined/edit?id=${id ?: ""}"
@@ -295,8 +295,12 @@ fun DriverApp(
             }
             composable(Routes.BID) { e ->
                 val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
-                PlaceBidScreen(r, bidForm, vm::setBidAmount, vm::setBidNote, { nav.popBackStack() }, { vm.submitBid(r.id) },
-                    onDone = { vm.resetBid(); nav.navigateToTabFresh(Routes.requests(1), Routes.REQUESTS) }, live = live[r.id], connection = connection)
+                PlaceBidScreen(
+                    r, bidForm, vm::setBidAmount, vm::setBidNote, { nav.popBackStack() }, { vm.submitBid(r.id) },
+                    onDone = { vm.resetBid(); nav.navigateToTabFresh(Routes.requests(1), Routes.REQUESTS) },
+                    live = live[r.id], connection = connection,
+                    boats = driver.vehicles, onBoat = vm::setBidBoat,
+                )
             }
             composable(Routes.CONFLICT) { e ->
                 val r = allRequests.firstOrNull { it.id == e.arguments?.getString("id") } ?: return@composable MissingContent({ nav.popBackStack() }) { nav.navigateToHome() }
@@ -378,6 +382,18 @@ fun DriverApp(
                     driver,
                     onBack = { nav.popBackStack() },
                     onReupload = { nav.go(Routes.KYC_VEHICLE) },
+                    onAdd = { nav.go(Routes.ADD_VEHICLE) },
+                )
+            }
+            composable(Routes.ADD_VEHICLE) {
+                AddVehicleScreen(
+                    defaultType = driver.vehicles.firstOrNull()?.type ?: VehicleType.BOAT,
+                    onBack = { nav.popBackStack() },
+                    onSave = { title, reg, cap, type ->
+                        vm.registerVehicle(title, reg, cap, type) {
+                            nav.popBackStack()
+                        }
+                    },
                 )
             }
             composable(Routes.NOTIFS) {

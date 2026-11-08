@@ -168,14 +168,44 @@ fun IncomingRequestScreen(r: TripRequest, conflict: Trip?, onBack: () -> Unit, o
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaceBidScreen(r: TripRequest, form: BidFormState, onAmount: (String) -> Unit, onNote: (String) -> Unit, onBack: () -> Unit, onSubmit: () -> Unit, onDone: () -> Unit,
-    live: LiveBid? = null, connection: ConnectionState = ConnectionState.LIVE) {
+fun PlaceBidScreen(
+    r: TripRequest,
+    form: BidFormState,
+    onAmount: (String) -> Unit,
+    onNote: (String) -> Unit,
+    onBack: () -> Unit,
+    onSubmit: () -> Unit,
+    onDone: () -> Unit,
+    live: LiveBid? = null,
+    connection: ConnectionState = ConnectionState.LIVE,
+    boats: List<Vehicle> = emptyList(),
+    onBoat: (String) -> Unit = {},
+) {
     val amt = form.amountInt ?: 0
     Scaffold(topBar = { DTopBar(stringResource(R.string.place_your_bid), onBack) }, bottomBar = {
         StickyCta { PrimaryButton(if (form.submitting) stringResource(R.string.submitting) else if (amt > 0) str(R.string.place_bid_amount, taka(amt)) else stringResource(R.string.place_bid), onSubmit, enabled = amt > 0, accent = true, loading = form.submitting) }
     }) { pad ->
         ScreenColumn(pad) {
             DCard { RouteText(r.from, r.to); Text(str(R.string.dot_join, r.slot.label(), pax(r.passengers)), color = DP.Muted, fontSize = 12.sp) }
+            if (boats.size > 1) {
+                DCard {
+                    Text(stringResource(R.string.bid_with_boat), color = DP.Muted, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    boats.forEach { v ->
+                        val selected = form.boatId == v.id
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = selected, onClick = { onBoat(v.id) })
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(v.name, style = MaterialTheme.typography.titleSmall)
+                                Text(str(R.string.dot_join3, v.type.title(), v.reg, plural(R.plurals.seats_count, v.seats)), color = DP.Muted, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
             LiveBidPanel(r, live, connection)
             DCard(color = DP.Primary100, border = null) {
                 Text(stringResource(R.string.suggested_range), color = DP.Primary600, fontSize = 12.sp)

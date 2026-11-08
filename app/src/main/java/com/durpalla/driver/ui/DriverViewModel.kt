@@ -28,7 +28,14 @@ data class AuthState(
 )
 
 /** [amount] is always ASCII digits (normalised on input), so parsing never depends on locale. */
-data class BidFormState(val amount: String = "", val note: String = "", val error: UiText? = null, val submitting: Boolean = false, val submitted: Bid? = null) {
+data class BidFormState(
+    val amount: String = "",
+    val note: String = "",
+    val boatId: String? = null,
+    val error: UiText? = null,
+    val submitting: Boolean = false,
+    val submitted: Bid? = null,
+) {
     val amountInt: Int? get() = DigitFormatter.parseInt(amount)
 }
 
@@ -260,19 +267,33 @@ class DriverViewModel(
     // ---- Bidding
     private val _bid = MutableStateFlow(BidFormState())
     val bidForm: StateFlow<BidFormState> = _bid
-    fun resetBid(prefill: Int? = null) { _bid.value = BidFormState(amount = prefill?.let { Integer.toString(it) } ?: "") }
+    fun resetBid(prefill: Int? = null) {
+        val primary = profileRepo.driver.value.vehicles.firstOrNull { it.isPrimary }?.id
+            ?: profileRepo.driver.value.vehicles.firstOrNull()?.id
+        _bid.value = BidFormState(amount = prefill?.let { Integer.toString(it) } ?: "", boatId = primary)
+    }
     fun setBidAmount(v: String) = _bid.update { it.copy(amount = DigitFormatter.digitsOnly(v, 6), error = null) }
     fun setBidNote(v: String) = _bid.update { it.copy(note = v.take(140)) }
+    fun setBidBoat(id: String) = _bid.update { it.copy(boatId = id, error = null) }
     fun submitBid(requestId: String) = viewModelScope.launch {
         val f = _bid.value
         val amt = f.amountInt ?: run { _bid.update { it.copy(error = UiText.res(R.string.err_rent)) }; return@launch }
+        val boats = profileRepo.driver.value.vehicles
+        if (boats.size > 1 && f.boatId.isNullOrBlank()) {
+            _bid.update { it.copy(error = UiText.res(R.string.err_pick_boat)) }; return@launch
+        }
         _bid.update { it.copy(submitting = true) }
-        requestRepo.placeBid(requestId, amt, f.note)
+        requestRepo.placeBid(requestId, amt, f.note, f.boatId)
             .onSuccess { b ->
                 _bid.update { it.copy(submitting = false, submitted = b) }
                 _live.update { BidReducer.myBid(it, requestId, b.id, b.amount) }
             }
             .onFailure { e -> _bid.update { it.copy(submitting = false, error = e.toUiText(R.string.err_generic)) } }
+    }
+    fun registerVehicle(title: String, registrationNo: String, capacity: Int, type: VehicleType, onOk: () -> Unit) = viewModelScope.launch {
+        profileRepo.registerVehicle(title, registrationNo, capacity, type)
+            .onSuccess { onOk() }
+            .onFailure(::showError)
     }
     fun skip(requestId: String) = viewModelScope.launch { requestRepo.skip(requestId) }
     fun withdrawBid(bidId: String) = viewModelScope.launch { requestRepo.withdrawBid(bidId).onFailure(::showError) }

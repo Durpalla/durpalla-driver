@@ -1,5 +1,7 @@
 # Active context
 
+- 2026-11-08: Multi-boat — Add Vehicle registers solo boat via `POST vehicles`; fleet drivers get admin assignment; bid picker when >1 boat; `me.vehicles[]`.
+- 2026-11-08: Vehicles “+ Add” opens Add Vehicle form (solo) / KYC still for docs.
 - 2026-11-07: Release signing — `scripts/generate_keystore.sh` + `scripts/run_release.sh` (`.env` STORE_* / API); `assembleRelease` uses `keystore/durpalla-driver-release.jks`.
 - 2026-11-07: Override R8 `9.1.29` in `settings.gradle.kts` so Kotlin 2.4 + AGP 8.7.3 release builds stop D8 kotlin-metadata warnings.
 - 2026-11-07: Create trip — two departure modes: fixed `departure` (HH:MM) or `openAnyTime` (skip time); API + migration `open_any_time` on `driver_predefined_trips`.

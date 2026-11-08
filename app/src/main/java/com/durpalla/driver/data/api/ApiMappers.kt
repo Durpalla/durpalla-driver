@@ -95,7 +95,18 @@ object ApiMappers {
     /** GET me + GET kyc → profile. */
     fun driver(me: JsonObject, kyc: JsonObject?): Driver {
         val type = vehicleType(me.s("vehicleType").ifBlank { kyc?.s("vehicleType").orEmpty() })
-        val vehicle = me.o("vehicle")?.let { v -> Vehicle(v.s("title"), type, v.s("registrationNo"), v.i("capacity"), me.opt("kycComplete")?.asBoolean ?: false) }
+        val verified = me.opt("kycComplete")?.asBoolean ?: false
+        fun mapVehicle(v: JsonObject) = Vehicle(
+            id = v.s("id"),
+            name = v.s("title"),
+            type = type,
+            reg = v.s("registrationNo"),
+            seats = v.i("capacity"),
+            verified = verified,
+            isPrimary = v.opt("isPrimary")?.asBoolean ?: false,
+        )
+        val vehicles = me.opt("vehicles")?.objects()?.map(::mapVehicle)?.takeIf { it.isNotEmpty() }
+            ?: listOfNotNull(me.o("vehicle")?.let(::mapVehicle))
         val docs = kyc?.opt("documents")?.objects()?.map { d ->
             val t = d.s("type")
             val path = d.s("viewPath").takeIf { it.isNotBlank() }
@@ -112,7 +123,7 @@ object ApiMappers {
         val avatar = me.s("avatarUrl").ifBlank { me.s("avatar") }.ifBlank { me.s("photo") }.ifBlank { null }
         return Driver(
             id = me.s("id"), name = me.s("name"), phone = me.s("phone"), rating = me.opt("rating")?.asDouble ?: 0.0, totalTrips = me.i("trips"), area = me.s("area"),
-            vehicles = listOfNotNull(vehicle), documents = docs, kycComplete = me.opt("kycComplete")?.asBoolean ?: false,
+            vehicles = vehicles, documents = docs, kycComplete = me.opt("kycComplete")?.asBoolean ?: false,
             kycStatus = kycStatus, kycNote = kyc?.s("note").orEmpty(),
             canBid = me.opt("canBid")?.asBoolean ?: false, online = me.opt("online")?.asBoolean ?: true,
             walletBalance = me.i("walletBalance"), hasWithdrawPin = me.opt("hasWithdrawPin")?.asBoolean ?: false,

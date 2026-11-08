@@ -432,6 +432,15 @@
     <string name="version_footer">Durpalla Driver v0.1 · A Durpalla Limited service</string>
     <string name="vehicles">Vehicles</string>
     <string name="add">+ Add</string>
+    <string name="vehicles_empty">No vehicle registered yet. Tap + Add to register your boat (solo) or ask admin to assign fleet boats.</string>
+    <string name="add_vehicle">Add vehicle</string>
+    <string name="add_vehicle_hint">Solo boat owners: register the boat you operate. Fleet drivers get boats assigned by the merchant/admin.</string>
+    <string name="vehicle_title">Boat / vehicle name</string>
+    <string name="vehicle_reg_no">Registration no.</string>
+    <string name="vehicle_capacity">Passenger capacity</string>
+    <string name="save_vehicle">Save vehicle</string>
+    <string name="bid_with_boat">Bid with which boat?</string>
+    <string name="err_pick_boat">Choose a boat for this bid.</string>
     <string name="documents">Documents</string>
     <string name="faq">FAQ</string>
     <string name="faq_q1">How does bidding work?</string>

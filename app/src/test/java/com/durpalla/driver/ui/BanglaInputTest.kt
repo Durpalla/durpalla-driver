@@ -37,8 +37,8 @@ class BanglaInputTest {
     /** Records the JSON body that would go over the wire. */
     private class RecordingRequests(private val d: RequestRepository) : RequestRepository by d {
         val bodies = mutableListOf<String>()
-        override suspend fun placeBid(requestId: String, amount: Int, note: String): Result<Bid> {
-            bodies += ApiJson.placeBid(requestId, amount, note); return d.placeBid(requestId, amount, note)
+        override suspend fun placeBid(requestId: String, amount: Int, note: String, boatId: String?): Result<Bid> {
+            bodies += ApiJson.placeBid(requestId, amount, note); return d.placeBid(requestId, amount, note, boatId)
         }
     }
     private class RecordingAuth(private val d: AuthRepository) : AuthRepository by d {

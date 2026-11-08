@@ -403,6 +403,15 @@
     <string name="version_footer">দূরপাল্লা ড্রাইভার v০.১ · দূরপাল্লা লিমিটেডের একটি সেবা</string>
     <string name="vehicles">যানবাহন</string>
     <string name="add">+ যোগ করুন</string>
+    <string name="vehicles_empty">এখনো কোনো যানবাহন নেই। একক মালিক হলে + যোগ করুন; ফ্লিট হলে অ্যাডমিন অ্যাসাইন করবে।</string>
+    <string name="add_vehicle">যানবাহন যোগ করুন</string>
+    <string name="add_vehicle_hint">একক নৌকা মালিক: যে নৌকা চালাবেন সেটি নিবন্ধন করুন। ফ্লিট ড্রাইভারদের নৌকা মার্চেন্ট/অ্যাডমিন অ্যাসাইন করে।</string>
+    <string name="vehicle_title">নৌকা / যানবাহনের নাম</string>
+    <string name="vehicle_reg_no">রেজিস্ট্রেশন নং</string>
+    <string name="vehicle_capacity">যাত্রী ধারণক্ষমতা</string>
+    <string name="save_vehicle">যানবাহন সেভ করুন</string>
+    <string name="bid_with_boat">কোন নৌকা দিয়ে বিড করবেন?</string>
+    <string name="err_pick_boat">এই বিডের জন্য একটি নৌকা বেছে নিন।</string>
     <string name="documents">কাগজপত্র</string>
     <string name="faq">সাধারণ জিজ্ঞাসা</string>
     <string name="faq_q1">বিডিং কীভাবে কাজ করে?</string>

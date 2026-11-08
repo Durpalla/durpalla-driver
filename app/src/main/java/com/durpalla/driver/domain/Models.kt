@@ -101,7 +101,15 @@ data class PredefinedTrip(
 
 data class Rating(val customer: String, val stars: Int, val comment: String, val date: LocalDate, val tripCode: String)
 
-data class Vehicle(val name: String, val type: VehicleType, val reg: String, val seats: Int, val verified: Boolean)
+data class Vehicle(
+    val id: String = "",
+    val name: String,
+    val type: VehicleType,
+    val reg: String,
+    val seats: Int,
+    val verified: Boolean,
+    val isPrimary: Boolean = false,
+)
 
 data class DocumentItem(
     val name: String,

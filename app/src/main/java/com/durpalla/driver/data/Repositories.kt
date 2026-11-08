@@ -41,7 +41,7 @@ interface RequestRepository {
     val requests: StateFlow<List<TripRequest>>
     val bids: StateFlow<List<Bid>>
     suspend fun refresh(): Result<Unit>
-    suspend fun placeBid(requestId: String, amount: Int, note: String): Result<Bid>
+    suspend fun placeBid(requestId: String, amount: Int, note: String, boatId: String? = null): Result<Bid>
     /** POST requests/{id}/skip (hidden from feed + fan-out). */
     suspend fun skip(requestId: String)
     suspend fun withdrawBid(bidId: String): Result<Unit>
@@ -95,5 +95,7 @@ interface ProfileRepository {
     suspend fun updateName(name: String): Result<Driver>
     /** JPEG bytes already cropped to 100×100 (customer parity). */
     suspend fun uploadAvatarJpeg(bytes: ByteArray): Result<Driver>
+    /** Solo operator: POST vehicles {title, registrationNo?, capacity?, vehicleType?}. */
+    suspend fun registerVehicle(title: String, registrationNo: String, capacity: Int, vehicleType: VehicleType): Result<Driver>
     fun clear()
 }

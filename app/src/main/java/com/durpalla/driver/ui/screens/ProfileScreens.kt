@@ -196,7 +196,7 @@ fun ProfileScreen(
 }
 
 @Composable
-fun VehiclesScreen(d: Driver, onBack: () -> Unit, onReupload: () -> Unit = {}) {
+fun VehiclesScreen(d: Driver, onBack: () -> Unit, onReupload: () -> Unit = {}, onAdd: () -> Unit = onReupload) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var preview by remember { mutableStateOf<Bitmap?>(null) }
@@ -219,7 +219,11 @@ fun VehiclesScreen(d: Driver, onBack: () -> Unit, onReupload: () -> Unit = {}) {
                     PrimaryButton(stringResource(R.string.reupload_documents), onReupload, accent = true)
                 }
             }
-            SectionHeader(stringResource(R.string.vehicles), stringResource(R.string.add))
+            SectionHeader(stringResource(R.string.vehicles), stringResource(R.string.add), onAction = onAdd)
+            if (d.vehicles.isEmpty()) {
+                EmptyState(stringResource(R.string.vehicles_empty))
+                PrimaryButton(stringResource(R.string.add_vehicle), onAdd, accent = true)
+            }
             d.vehicles.forEach { v ->
                 DCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
