@@ -8,6 +8,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -82,7 +83,7 @@ fun AddVehicleScreen(
             SectionHeader(stringResource(R.string.kyc_what))
             VehicleType.entries.forEach { vt ->
                 val selected = type == vt
-                DCard(onClick = { type = vt }, color = if (selected) DP.Primary100 else DP.Card) {
+                DCard(onClick = { type = vt }, color = if (selected) DP.Primary100 else Color.White) {
                     Text(vt.title(), style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
                 }
             }
