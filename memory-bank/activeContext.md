@@ -1,5 +1,6 @@
 # Active context
 
+- 2026-11-10: Agora calling — apigw holds App ID/Certificate; driver joins via server token. Needs Firebase (`google-services.json`) for Firestore signaling + FCM. Local `.env`/`local.properties` seeded with `API_HOST=https://dev-apigw.durpalla.com`.
 - 2026-11-08: Multi-boat — Add Vehicle registers solo boat via `POST vehicles`; fleet drivers get admin assignment; bid picker when >1 boat; `me.vehicles[]`.
 - 2026-11-08: Vehicles “+ Add” opens Add Vehicle form (solo) / KYC still for docs.
 - 2026-11-07: Release signing — `scripts/generate_keystore.sh` + `scripts/run_release.sh` (`.env` STORE_* / API); `assembleRelease` uses `keystore/durpalla-driver-release.jks`.
